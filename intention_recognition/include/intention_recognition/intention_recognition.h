@@ -10,8 +10,8 @@ using namespace std;
 class IntentionRecognition {
 
 public:
-	IntentionRecognition(string human, vector<string> context_list, vector<string> intention_lis_, vector<string> action_list, 
-		vector<Intention> intentions_, ros::NodeHandle node_handle_);
+	IntentionRecognition(string human, vector<string> context_list, vector<string> intention_list_, vector<string> action_list, 
+		vector<Intention> intentions_, vector<string> target_list, map<string,vector<string> > target_action_list, ros::NodeHandle node_handle_);
 
 	void start();
 	void stop();
@@ -22,11 +22,13 @@ private:
 	void createActionNodes();
 	void createObservationNodes();
 
-	void checkForNewActions();
+	void checkValidActions();
 
 	bool shouldRun();
 
 	double getQValue(string intention, string action);
+
+	string getHumanObject();
 
 	ros::NodeHandle node_handle_;
 
@@ -40,10 +42,22 @@ private:
 	vector<string> action_list_;
 	vector<string> intention_list_;
 
+	map<string,vector<string> > target_action_list_;
+	vector<string> object_list_;
+
+	vector<string> valid_actions_;
+
 	vector<string> distance_values_;
 	vector<string> intention_values_;
 
 	map<string,ros::ServiceClient> mdp_action_value_services_;
+
+	map<string,ros::ServiceClient> client_preconditions_services_;
+
+	ros::ServiceClient database_client_;
+
+	ros::Publisher publish_intention_;
+
 
 
 };

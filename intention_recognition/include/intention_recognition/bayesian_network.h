@@ -45,13 +45,16 @@ public:
     int getIndex(string label);
     std::map<string, int> getValues(int i);
     std::map<string, int> getValues(string label);
-    void computeProbability(std::map<string, string> nodeValues);
+    map<string,double> computeProbability(std::map<string, string> nodeValues);
 
     bool addNode(string node, std::vector<string> parents, bool isTemporal, string probabilityMode, string dominantParent);
 
     bool addNode(string node, std::vector<string> parents, std::vector<probAssignment> probTable);
 
     bool addMultiValueNode(string node, string parent, std::vector<string> values);
+
+    setNodes(int size);
+
 
 private:
     directed_graph<bayes_node>::kernel_1a_c *bn;
