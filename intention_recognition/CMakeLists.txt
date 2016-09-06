@@ -4,7 +4,8 @@ project(intention_recognition)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED roscpp rospy )
+find_package(catkin REQUIRED roscpp rospy message_runtime situation_assessment_actions_msgs
+situation_assessment_msgs )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -98,7 +99,7 @@ find_package(catkin REQUIRED roscpp rospy )
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES intention_recognition
-#  CATKIN_DEPENDS other_catkin_pkg
+  CATKIN_DEPENDS message_runtime situation_assessment_msgs situation_assessment_actions_msgs
 #  DEPENDS system_lib
 )
 
@@ -121,11 +122,11 @@ catkin_package(
 # add_dependencies(intention_recognition ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-# add_executable(intention_recognition_node src/intention_recognition_node.cpp)
+ add_executable(intention_recognition src/main.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-# add_dependencies(intention_recognition_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(intention_recognition ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(intention_recognition
