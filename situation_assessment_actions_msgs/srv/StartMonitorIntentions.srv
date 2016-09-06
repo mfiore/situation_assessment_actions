@@ -1,2 +1,7 @@
-
+string agent
+string[] contexts
+string[] context_values
+string[] intentions
+string[] actions
 ---
+bool report

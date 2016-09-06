@@ -4,7 +4,13 @@ project(situation_assessment_actions_msgs)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED roscpp rospy message_generation std_msgs)
+find_package(catkin REQUIRED COMPONENTS
+  message_generation
+  message_runtime
+  roscpp
+  rospy
+  std_msgs
+)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -40,18 +46,18 @@ find_package(catkin REQUIRED roscpp rospy message_generation std_msgs)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-add_message_files(
-  FILES
-  AgentInference.msg
-  IntentionGraphResult.msg
-)
+ add_message_files(
+   FILES
+   AgentInference.msg
+   IntentionGraphResult.msg
+ )
 
 ## Generate services in the 'srv' folder
-add_service_files(
-  FILES
- # StartMonitorIntentions.srv
-  StopMonitorIntentions.srv
-)
+ add_service_files(
+   FILES
+   StartMonitorIntentions.srv
+   StopMonitorIntentions.srv
+ )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -61,10 +67,10 @@ add_service_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-  DEPENDENCIES
-  std_msgs  # Or other packages containing msgs
-)
+ generate_messages(
+   DEPENDENCIES
+   std_msgs
+ )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -98,7 +104,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES situation_assessment_actions_msgs
- CATKIN_DEPENDS std_msgs
+#  CATKIN_DEPENDS message_generation message_runtime roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
 
@@ -109,6 +115,9 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+)
 
 ## Declare a C++ library
 # add_library(situation_assessment_actions_msgs

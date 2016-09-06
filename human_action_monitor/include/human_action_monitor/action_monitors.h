@@ -1,3 +1,7 @@
+/*
+This class is used to monitor human actions.
+*/
+
 #ifndef ACTION_MONITORS_H
 #define ACTION_MONITORS_H
 #include <ros/ros.h>
@@ -20,6 +24,7 @@
 #include <boost/lexical_cast.hpp>
 
 
+
 using namespace std;
 
 class ActionMonitors {
@@ -30,47 +35,43 @@ private:
 	void monitorLoop();
 	void databaseLoop();
 
-	ros::NodeHandle node_handle_;
-	ros::ServiceClient database_query_client_;
-	ros::Subscriber fact_subscriber_;
-
-	map<string,ros::Publisher> human_action_topics_;
-	map<string,ros::ServiceClient> action_preconditions_services_;
-	map<string,ros::ServiceClient> action_postconditions_services_;
-	map<string,string> object_to_actions_;
-
-
-	vector<string> human_list_;
-	vector<string> actions_to_monitor_;
-	vector<string> object_list_;
-	map<string,vector<string> > object_affordances_;
-
-	vector<string> monitored_actions_;
-
 	void agentFactCallback(const situation_assessment_msgs::FactList::ConstPtr& msg);
 
-	string getHumanObject(string human);
-	void setHumanObject(string human,string object);
-	double getObjectDistance(string human,string object);
-	void setObjectDistance(string human,string object,double distance);
+	string getHumanObject(string human); //returns the object (if any) held by the human
+	void setHumanObject(string human,string object);  //sets that the human holds an object
+	double getObjectDistance(string human,string object); //gets the distance between a human's hand and an object
+	void setObjectDistance(string human,string object,double distance); //sets this distance
+
+
+	ros::NodeHandle node_handle_; 
+	ros::ServiceClient database_query_client_; //used only if we are using the database to get human observation
+	ros::Subscriber fact_subscriber_; //used if we are looping on a topic to get observations
+
+	map<string,ros::Publisher> human_action_topics_; //actions performed by each humans are published here
+	//a map that links an action name with a service to get its preconditions\postconditions
+	map<string,ros::ServiceClient> action_preconditions_services_;
+	map<string,ros::ServiceClient> action_postconditions_services_;
+
+	//values read from parameters
+	vector<string> human_list_;
+	vector<string> actions_to_monitor_;  
+	vector<string> object_list_;
+	map<string,vector<string> > object_affordances_; //links an object to possible actions
+
 
 	boost::mutex mutex_human_objects_;
-	map<string,string> human_objects_;
+	map<string,string> human_objects_;  //maps each human to an object that he holds
 	boost::mutex mutex_object_distance_;
-	map<pair<string,string>,double> object_distances_;
+	map<pair<string,string>,double> object_distances_; //much a pair human-object to a distance
 
-	double trigger_distance_;
+	double trigger_distance_;  //trigger for deciding that an action is done
 
-	string robot_name_;
+	string robot_name_; 
 
-	bool use_database_;
+	bool use_database_; //parameter that decides if we use the db or a topic to get observations
 
-	ros::ServiceClient database_client_;
+	ros::ServiceClient database_client_;  //puts facts in the db
 };
 
-//creating a topic for each agent with the performed actions
-
-//action list
-//including the action library?
 
 #endif

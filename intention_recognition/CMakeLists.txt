@@ -1,3 +1,16 @@
+ ## check c++11 / c++0x
+ include(CheckCXXCompilerFlag)
+ check_cxx_compiler_flag("-std=c++11" COMPILER_SUPPORTS_CXX11)
+ check_cxx_compiler_flag("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+ if(COMPILER_SUPPORTS_CXX11)
+ 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+ elseif(COMPILER_SUPPORTS_CXX0X)
+ 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+ else()
+ 		message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+ endif()
+
+
 cmake_minimum_required(VERSION 2.8.3)
 project(intention_recognition)
 
@@ -8,7 +21,7 @@ find_package(catkin REQUIRED roscpp rospy message_runtime situation_assessment_a
 situation_assessment_msgs )
 
 ## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+find_package(Boost REQUIRED COMPONENTS system thread)
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -109,7 +122,14 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
+include_directories(
+#include
+  ${catkin_INCLUDE_DIRS}
+  ${boost_INCLUDE_DIRS}
+  $ENV{MDP_DIR}
+  $ENV{IG_DIR}
+  $ENV{DLIB_DIR}
+)
 
 ## Declare a C++ library
 # add_library(intention_recognition
@@ -126,13 +146,14 @@ catkin_package(
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(intention_recognition ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(intention_recognition ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}
+situation_assessment_msgs_generate_messages_cpp situation_assessment_actions_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(intention_recognition
    ${catkin_LIBRARIES}
-    $ENV{MDPLIB_DIR}/libpomdp.a
-    $ENV{IGLIB_DIR}/libIntentionGraph.so
+    $ENV{MDP_DIR}/dist/Debug/GNU-Linux/libpomdp.so
+    $ENV{IG_DIR}/dist/Debug/GNU-Linux/libIntentionGraph.so
  )
 
 #############

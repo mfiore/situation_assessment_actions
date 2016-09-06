@@ -32,10 +32,15 @@ ActionMonitors::ActionMonitors(ros::NodeHandle node_handle):node_handle_(node_ha
 		}
 	}	
 
-	ROS_INFO("HUMAN_ACTION_MONITOR Connecting to database");
-	database_client_=node_handle_.serviceClient<situation_assessment_msgs::QueryDatabase>("situation_assessment/query_database");
-	database_client_.waitForExistence();
-	ROS_INFO("HUMAN_ACTION_MONITOR Connected");
+	string use_db_string=use_database_?"use the database":"use the fact topic";
+	ROS_INFO("HUMAN_ACTION_MONITOR will %s to get observations",use_db_string.c_str());
+
+	if (use_database_) {
+		ROS_INFO("HUMAN_ACTION_MONITOR Connecting to database");
+		database_client_=node_handle_.serviceClient<situation_assessment_msgs::QueryDatabase>("situation_assessment/query_database");
+		database_client_.waitForExistence();
+		ROS_INFO("HUMAN_ACTION_MONITOR Connected");
+	}
 
 	ROS_INFO("HUMAN_ACTION_MONITOR Connecting to action services");
 	for (int i=0;i<actions_to_monitor_.size();i++) {
@@ -46,11 +51,10 @@ ActionMonitors::ActionMonitors(ros::NodeHandle node_handle):node_handle_(node_ha
 	}
 	ROS_INFO("HUMAN_ACTION_MONITOR connected to action services");
 
-
-
-
-	ROS_INFO("HUMAN_ACTION_MONITOR Subscribing to agent facts");
-	fact_subscriber_=node_handle.subscribe("situation_assessment/agent_fact_list",1000,&ActionMonitors::agentFactCallback,this);
+	if (!use_database_) {
+		ROS_INFO("HUMAN_ACTION_MONITOR Subscribing to agent facts");
+		fact_subscriber_=node_handle.subscribe("situation_assessment/agent_fact_list",1000,&ActionMonitors::agentFactCallback,this);
+	}
 
 	ROS_INFO("HUMAN_ACTION_MONITOR Advertising topics");
 	for (int i=0; i<human_list_.size();i++) {
@@ -70,15 +74,15 @@ void ActionMonitors::start() {
 }
 void ActionMonitors::agentFactCallback(const situation_assessment_msgs::FactList::ConstPtr& msg) {
 	map<string,bool> has_object;
+	// //for each agent get if he has an object
 	for (int i=0;i<human_list_.size();i++) {
 		string human=human_list_[i];
-		if (getHumanObject(human)!="") {
-			has_object[human]=true;
+		if (getHumanObject(human)!=""){ //this just get the object from a map in a thread safe way{
+			has_object[human]=true;  
 		}
 	}
 
 	map<string,bool> found_object;
-
 	for (int i=0;i<msg->fact_list.size();i++) {
 		situation_assessment_msgs::Fact fact=msg->fact_list[i];
 		if (fact.predicate.size()>2 && fact.value.size()>0) {
@@ -86,6 +90,8 @@ void ActionMonitors::agentFactCallback(const situation_assessment_msgs::FactList
 				if (std::find(human_list_.begin(),human_list_.end(),fact.subject)!=human_list_.end()) {
 					if (std::find(object_list_.begin(),object_list_.end(),fact.predicate[2])!=object_list_.end()) {
 						setObjectDistance(fact.subject,fact.predicate[2],boost::lexical_cast<double>(fact.value[0]));
+						//if the subject is a human in our monitor list and the predicate is distance hand 
+						//object of a monitored object we set the distance between the two
 					}
 				}
 			}
@@ -95,6 +101,8 @@ void ActionMonitors::agentFactCallback(const situation_assessment_msgs::FactList
 				if (fact.predicate[0]=="has") {
 					if (!has_object[fact.subject]) {
 						setHumanObject(fact.subject,fact.value[0]);
+						//if we have a predicate where an agent has an object, we record it in the map
+						//in a thread safe way using setHumanObject
 					}
 					found_object[fact.subject]=true;
 				}
@@ -104,6 +112,7 @@ void ActionMonitors::agentFactCallback(const situation_assessment_msgs::FactList
 	for (int i=0;i<human_list_.size();i++) {
 		if (has_object[human_list_[i]] && !found_object[human_list_[i]]) {
 			setHumanObject(human_list_[i],"");
+			//if an agent had an object but now he doesn't have it anymore we remove it in the map
 		}
 	}
 
@@ -184,18 +193,28 @@ void ActionMonitors::monitorLoop() {
 
 	while (ros::ok()) {
 		for (int i=0; i<object_list_.size();i++) {
+			//For each object
+
 			string object=object_list_[i];
 			vector<string> affordances=object_affordances_[object];
 			for (int j=0;j<affordances.size();j++) {
+				//let's consider every affordance of the object (e.g. every action that can be done on it)
+
 				string action=affordances[j];
 				for (int k=0;k<human_list_.size();k++) {
+					//for each human we will check if the preconditions of this action are satisfied
+
 					string human=human_list_[k];
 					common_msgs::ParameterList parameter_list;
 					common_msgs::Parameter target_parameter;
+					//we set the parameters
 					target_parameter.name="target";
 					target_parameter.value=object;
 					parameter_list.parameter_list.push_back(target_parameter);
 					string human_object=getHumanObject(human);
+					//if he has an object we consider it has parameter of the action (since with our mocap
+					//humans can only have one hand. When they have an object they need to use it somewhere
+					//or place it)
 					if (human_object!="") {
 						common_msgs::Parameter object_parameter;
 						object_parameter.name="object";
@@ -204,10 +223,13 @@ void ActionMonitors::monitorLoop() {
 					}
 					action_management_msgs::CheckPreconditions preconditions_msg;
 					preconditions_msg.request.parameters=parameter_list;
+					//check the preconditions
 					if (action_preconditions_services_[action].call(preconditions_msg)) {
 						if (preconditions_msg.response.value==true) {
+							//if they are satisfied compare distance between hand an object to trigger
 							double hand_distance=getObjectDistance(human,object);
 							if (hand_distance<trigger_distance_) {
+								//if it's less set the postconditions of the action and publish that the action has been done
 								action_management_msgs::SetPostconditions postconditions_msg;
 								postconditions_msg.request.parameters=parameter_list;
 								if (action_postconditions_services_[action].call(postconditions_msg)) {
