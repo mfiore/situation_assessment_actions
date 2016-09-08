@@ -1,10 +1,10 @@
 #include <human_action_monitor/action_monitors.h>
 
 ActionMonitors::ActionMonitors(ros::NodeHandle node_handle):node_handle_(node_handle) {
-	node_handle_.getParam("/situation_assessment/human_agents",human_list_);
-	node_handle_.getParam("/situation_assessment/actions_to_monitor",actions_to_monitor_);
-	node_handle_.getParam("/situation_assessment/object_list",object_list_);
-	node_handle_.getParam("/situation_assessment/trigger_distance",trigger_distance_);
+	node_handle_.getParam("/situation_assessment/human_names",human_list_);
+	node_handle_.getParam("/situation_assessment/human_action_monitor/actions_to_monitor",actions_to_monitor_);
+	node_handle_.getParam("/situation_assessment/object_names",object_list_);
+	node_handle_.getParam("/situation_assessment/human_action_monitor/trigger_distance",trigger_distance_);
 	node_handle_.getParam("/situation_assessment/human_action_monitor/use_database",use_database_);
 	node_handle_.getParam("/robot_name",robot_name_);
 
@@ -57,10 +57,14 @@ ActionMonitors::ActionMonitors(ros::NodeHandle node_handle):node_handle_(node_ha
 	}
 
 	ROS_INFO("HUMAN_ACTION_MONITOR Advertising topics");
-	for (int i=0; i<human_list_.size();i++) {
-		ros::Publisher pub=node_handle_.advertise<action_management_msgs::Action>("/situation_assessment/"+human_list_[i]+"/action_performed",1000);
-		human_action_topics_[human_list_[i]]=pub;
-	}
+	// for (int i=0; i<human_list_.size();i++) {
+	// 	ros::Publisher pub=node_handle_.advertise<action_management_msgs::Action>("/situation_assessment/"+human_list_[i]+"/action_performed",1000);
+	// 	human_action_topics_[human_list_[i]]=pub;
+	// }
+
+	executed_actions_pub_=node_handle_.advertise<action_management_msgs::Action>("/situation_assessment/humans_executed_actions");
+	human_executable_actions_pub_=node_handle_.advertise<action_management_msgs::ExecutableActions>("/situation_assessment/human_executable_actions",1000);
+
 
 }
 
@@ -192,6 +196,8 @@ void ActionMonitors::monitorLoop() {
 	ros::Rate r(3);
 
 	while (ros::ok()) {
+		situation_assessment_actions_msgs::ExecutableActions executable_actions_msg;
+
 		for (int i=0; i<object_list_.size();i++) {
 			//For each object
 
@@ -202,6 +208,8 @@ void ActionMonitors::monitorLoop() {
 
 				string action=affordances[j];
 				for (int k=0;k<human_list_.size();k++) {
+
+
 					//for each human we will check if the preconditions of this action are satisfied
 
 					string human=human_list_[k];
@@ -221,6 +229,7 @@ void ActionMonitors::monitorLoop() {
 						object_parameter.value=human_object;
 						parameter_list.parameter_list.push_back(object_parameter);
 					}
+
 					action_management_msgs::CheckPreconditions preconditions_msg;
 					preconditions_msg.request.parameters=parameter_list;
 					//check the preconditions
@@ -243,6 +252,12 @@ void ActionMonitors::monitorLoop() {
 									ROS_ERROR("ACTION_MONITORS failed to set postconditions for action %s",action.c_str());
 								}
 							}
+							else { //if the action was not executed add it to the list of executable actions
+								action_management_msgs::Action action_msg;
+								action_msg.name=action;
+								action_msg.parameters=parameter_list;
+								executable_actions_msg.executable_actions.push_back(action_msg);
+							}
 						}	
 					}
 					else {
@@ -251,6 +266,7 @@ void ActionMonitors::monitorLoop() {
 				}
 			}
 		}
+		executed_actions_pub_.publish(executable_actions_msg);
 		r.sleep();
 	}
 

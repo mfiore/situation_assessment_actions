@@ -32,29 +32,23 @@ public:
 	ActionMonitors(ros::NodeHandle node_handle);
 	void start();
 private:
-	void monitorLoop();
-	void databaseLoop();
 
-	void agentFactCallback(const situation_assessment_msgs::FactList::ConstPtr& msg);
-
-	string getHumanObject(string human); //returns the object (if any) held by the human
-	void setHumanObject(string human,string object);  //sets that the human holds an object
 	double getObjectDistance(string human,string object); //gets the distance between a human's hand and an object
 	void setObjectDistance(string human,string object,double distance); //sets this distance
-
 
 	ros::NodeHandle node_handle_; 
 	ros::ServiceClient database_query_client_; //used only if we are using the database to get human observation
 	ros::Subscriber fact_subscriber_; //used if we are looping on a topic to get observations
 
-	map<string,ros::Publisher> human_action_topics_; //actions performed by each humans are published here
+	// map<string,ros::Publisher> human_action_topics_; //actions performed by each humans are published here
+	ros::Publisher executed_actions_pub_;
+
 	//a map that links an action name with a service to get its preconditions\postconditions
-	map<string,ros::ServiceClient> action_preconditions_services_;
 	map<string,ros::ServiceClient> action_postconditions_services_;
 
 	//values read from parameters
 	vector<string> human_list_;
-	vector<string> actions_to_monitor_;  
+	vector<string> actions_executable_;  
 	vector<string> object_list_;
 	map<string,vector<string> > object_affordances_; //links an object to possible actions
 
