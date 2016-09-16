@@ -1,276 +1,125 @@
 #include <human_action_monitor/action_monitors.h>
 
 ActionMonitors::ActionMonitors(ros::NodeHandle node_handle):node_handle_(node_handle) {
-	node_handle_.getParam("/situation_assessment/human_names",human_list_);
-	node_handle_.getParam("/situation_assessment/human_action_monitor/actions_to_monitor",actions_to_monitor_);
-	node_handle_.getParam("/situation_assessment/object_names",object_list_);
-	node_handle_.getParam("/situation_assessment/human_action_monitor/trigger_distance",trigger_distance_);
-	node_handle_.getParam("/situation_assessment/human_action_monitor/use_database",use_database_);
-	node_handle_.getParam("/robot_name",robot_name_);
+	node_handle_.getParam("/situation_assessment/robot_name",robot_name_);
 
-	ROS_INFO("HUMAN_ACTION_MONITOR human agents:");
-	for (int i=0;i<human_list_.size();i++) {
-		ROS_INFO("HUMAN_ACTION_MONITOR - %s",human_list_[i].c_str());
-	}
+	node_handle_.getParam("/situation_assessment/action_monitoring/actions_to_monitor",actions_to_monitor_);
+	node_handle_.getParam("/situation_assessment/action_monitoring/trigger_distance",trigger_distance_);
+	node_handle_.getParam("/situation_assessment/action_monitoring/use_database",use_database_);
+
+	ROS_INFO("HUMAN_ACTION_MONITOR robot %s",robot_name_.c_str());
 	ROS_INFO("HUMAN_ACTION_MONITOR actions to monitor:");
 	for (int i=0;i<actions_to_monitor_.size();i++) {
 		ROS_INFO("HUMAN_ACTION_MONITOR - %s",actions_to_monitor_[i].c_str());
+
+		std::string target;
+		std::string monitor_part;
+
+		node_handle_.getParam("/situation_assessment/action_monitoring/actions_details/"
+			+actions_to_monitor_[i]+"/target",target);
+		node_handle_.getParam("/situation_assessment/action_monitoring/actions_details/"
+			+actions_to_monitor_[i]+"/monitor_part",monitor_part);
+
+		ROS_INFO("HUMAN_ACTION_MONITOR target is %s",target.c_str());
+		ROS_INFO("HUMAN_ACTION_MONITOR monitor part is %s",monitor_part.c_str());
+		action_targets_[actions_to_monitor_[i]]=target;
+		action_monitor_parts_[actions_to_monitor_[i]]=monitor_part;
+
 	}
-	ROS_INFO("HUMAN_ACTION_MONITOR object list:");
-	for (int i=0;i<object_list_.size();i++) {
-		ROS_INFO("HUMAN_ACTION_MONITOR - %s",object_list_[i].c_str());
-	}
 
-	for (int i=0; i<object_list_.size();i++) {
-		vector<string> affordances;
-		node_handle_.getParam("/situation_assessment/affordances/"+object_list_[i],affordances);
-		object_affordances_[object_list_[i]]=affordances;
-
-		ROS_INFO("HUMAN_ACTION_MONITOR affordances for %s are",object_list_[i].c_str());
-		for (int j=0;j<object_affordances_[object_list_[i]].size();j++) {
-			ROS_INFO("HUMAN_ACTION_MONITOR - %s",object_affordances_[object_list_[i]][j].c_str());
-		}
-	}	
-
-	string use_db_string=use_database_?"use the database":"use the fact topic";
-	ROS_INFO("HUMAN_ACTION_MONITOR will %s to get observations",use_db_string.c_str());
-
-	if (use_database_) {
-		ROS_INFO("HUMAN_ACTION_MONITOR Connecting to database");
-		database_client_=node_handle_.serviceClient<situation_assessment_msgs::QueryDatabase>("situation_assessment/query_database");
-		database_client_.waitForExistence();
-		ROS_INFO("HUMAN_ACTION_MONITOR Connected");
-	}
+	ROS_INFO("HUMAN_ACTION_MONITOR Connecting to database");
+	database_query_client_=node_handle_.serviceClient<situation_assessment_msgs::QueryDatabase>("situation_assessment/query_database");
+	database_query_client_.waitForExistence();
+	ROS_INFO("HUMAN_ACTION_MONITOR Connected");
 
 	ROS_INFO("HUMAN_ACTION_MONITOR Connecting to action services");
 	for (int i=0;i<actions_to_monitor_.size();i++) {
-		ros::ServiceClient client_preconditions=node_handle_.serviceClient<action_management_msgs::CheckPreconditions>("/supervision/actions/"+actions_to_monitor_[i]+"/check_preconditions");
-		ros::ServiceClient client_postconditions=node_handle_.serviceClient<action_management_msgs::SetPostconditions>("/supervision/actions/"+actions_to_monitor_[i]+"/set_postconditions");
-		action_preconditions_services_[actions_to_monitor_[i]]=client_preconditions;
+		ros::ServiceClient client_postconditions=node_handle_.serviceClient<action_management_msgs::SetPostconditions>("/action_management/actions/"+actions_to_monitor_[i]+"/setPostconditions");
+		client_postconditions.waitForExistence();
 		action_postconditions_services_[actions_to_monitor_[i]]=client_postconditions;
 	}
 	ROS_INFO("HUMAN_ACTION_MONITOR connected to action services");
 
-	if (!use_database_) {
-		ROS_INFO("HUMAN_ACTION_MONITOR Subscribing to agent facts");
-		fact_subscriber_=node_handle.subscribe("situation_assessment/agent_fact_list",1000,&ActionMonitors::agentFactCallback,this);
-	}
+	executable_actions_subscriber_=node_handle_.subscribe("situation_assessment/human_executable_actions", 
+		1000,&ActionMonitors::executableActionsCallback,this);
 
-	ROS_INFO("HUMAN_ACTION_MONITOR Advertising topics");
-	// for (int i=0; i<human_list_.size();i++) {
-	// 	ros::Publisher pub=node_handle_.advertise<action_management_msgs::Action>("/situation_assessment/"+human_list_[i]+"/action_performed",1000);
-	// 	human_action_topics_[human_list_[i]]=pub;
-	// }
-
-	executed_actions_pub_=node_handle_.advertise<action_management_msgs::Action>("/situation_assessment/humans_executed_actions");
-	human_executable_actions_pub_=node_handle_.advertise<action_management_msgs::ExecutableActions>("/situation_assessment/human_executable_actions",1000);
-
-
+	executed_actions_pub_=node_handle_.advertise<action_management_msgs::ActionList>("/situation_assessment/humans_executed_actions",1000);
 }
 
-void ActionMonitors::start() {
-	if (use_database_) {
-		databaseLoop();
-	}
-	else {
-		monitorLoop();
-	}
-}
-void ActionMonitors::agentFactCallback(const situation_assessment_msgs::FactList::ConstPtr& msg) {
-	map<string,bool> has_object;
-	// //for each agent get if he has an object
-	for (int i=0;i<human_list_.size();i++) {
-		string human=human_list_[i];
-		if (getHumanObject(human)!=""){ //this just get the object from a map in a thread safe way{
-			has_object[human]=true;  
-		}
-	}
-
-	map<string,bool> found_object;
-	for (int i=0;i<msg->fact_list.size();i++) {
-		situation_assessment_msgs::Fact fact=msg->fact_list[i];
-		if (fact.predicate.size()>2 && fact.value.size()>0) {
-			if (fact.predicate[0]=="distance" && fact.predicate[1]=="hand") {
-				if (std::find(human_list_.begin(),human_list_.end(),fact.subject)!=human_list_.end()) {
-					if (std::find(object_list_.begin(),object_list_.end(),fact.predicate[2])!=object_list_.end()) {
-						setObjectDistance(fact.subject,fact.predicate[2],boost::lexical_cast<double>(fact.value[0]));
-						//if the subject is a human in our monitor list and the predicate is distance hand 
-						//object of a monitored object we set the distance between the two
-					}
-				}
-			}
-		}
-		else if (fact.predicate.size()>0 && fact.value.size()>0) {
-			if (std::find(human_list_.begin(),human_list_.end(),fact.subject)!=human_list_.end()) {
-				if (fact.predicate[0]=="has") {
-					if (!has_object[fact.subject]) {
-						setHumanObject(fact.subject,fact.value[0]);
-						//if we have a predicate where an agent has an object, we record it in the map
-						//in a thread safe way using setHumanObject
-					}
-					found_object[fact.subject]=true;
-				}
-			}
-		}
-	}
-	for (int i=0;i<human_list_.size();i++) {
-		if (has_object[human_list_[i]] && !found_object[human_list_[i]]) {
-			setHumanObject(human_list_[i],"");
-			//if an agent had an object but now he doesn't have it anymore we remove it in the map
-		}
-	}
-
+void ActionMonitors::executableActionsCallback(
+ 	const situation_assessment_actions_msgs::ExecutableActions::ConstPtr& msg) {
+ 	
+ 	executable_actions_=msg->executable_actions;
 }
 
-void ActionMonitors::databaseLoop() {
-	ros::Rate r(3);
-	while (ros::ok()) {
-		situation_assessment_msgs::QueryDatabase srv;
-		for (int i=0;i<human_list_.size();i++) {
-			string human=human_list_[i];
-			situation_assessment_msgs::Fact object_in_hand_fact;
-			object_in_hand_fact.model=robot_name_;
-			object_in_hand_fact.subject=human;
-			object_in_hand_fact.predicate.push_back("has");
+std::map<std::string,std::string> ActionMonitors::getParameterMap(
+	std::vector<common_msgs::Parameter> parameter_message) {
+	std::map<std::string,std::string> parameters;
 
-			situation_assessment_msgs::QueryDatabase srv;
-			srv.request.query=object_in_hand_fact;
-			if (!database_client_.call(srv)) {
-				ROS_ERROR("ACTION_MONITORS could not contact DB");
+	for (int i = 0; i < parameter_message.size(); ++i)
+	{
+		parameters[parameter_message[i].name]=parameter_message[i].value;
+	}
+	return parameters;
+}
+
+double ActionMonitors::getDistance(string agent, string target, string monitor_part) {
+	situation_assessment_msgs::QueryDatabase srv;
+	srv.request.query.model=robot_name_;
+	srv.request.query.subject=agent;
+	srv.request.query.predicate.push_back("distance");
+	// srv.request.query.predicate.push_back(monitor_part);
+	srv.request.query.predicate.push_back(target);
+
+	// ROS_INFO("MODEL %s subject %s predicate %s %s",robot_name_.c_str(),agent.c_str(),srv.request.query.predicate[0].c_str(),
+		// srv.request.query.predicate[1].c_str());
+	if (database_query_client_.call(srv)) {
+		if (srv.response.result.size()>0) {
+			if (srv.response.result[0].value.size()>0) {
+				return std::stod(srv.response.result[0].value[0]);
 			}
 			else {
-				if (srv.response.result.size()>0 && srv.response.result[0].value.size()>0) {
-					setHumanObject(human,srv.response.result[0].value[0]);
-				}
-			}
+				ROS_WARN("ACTION_MONITORS no values in database response");
+			}		
+		}
+		else {
+			ROS_WARN("ACTION_MONITORS no results in database response");			
+		}
+	}
+	else {
+		ROS_WARN("ACTION_MONITORS failed to contact database");
+	}
+	return 10000;
 
-			for (int i=0; i<object_list_.size();i++) {
-				string object=object_list_[i];
-				situation_assessment_msgs::Fact distance_to_object_fact;
-				distance_to_object_fact.model=robot_name_;
-				distance_to_object_fact.subject="human";
-				distance_to_object_fact.predicate.push_back("distance");
-				distance_to_object_fact.predicate.push_back("hand");
-				distance_to_object_fact.predicate.push_back(object);	
+}
+void ActionMonitors::actionLoop() {
+	ros::Rate r(3);
+	while (ros::ok()) {
+		ros::spinOnce();
+		action_management_msgs::ActionList actions_to_execute;
+		for (int i=0; i<executable_actions_.size();i++) {
+			string action_name=executable_actions_[i].name;
+			std::map<std::string,std::string> parameters=getParameterMap(executable_actions_[i].parameters);
+			string t=action_targets_.at(action_name);
+			string action_target=parameters.at(t);
+			string agent=parameters.at("main_agent");
 
-				srv.request.query=distance_to_object_fact;
-				if (!database_client_.call(srv)) {
-					ROS_ERROR("ACTION_MONITORS could not contact DB");
+			string monitor_part=action_monitor_parts_.at(action_name);
+			double distance=getDistance(agent,action_target,monitor_part);
+			if (distance<trigger_distance_) {
+				action_management_msgs::SetPostconditions srv;
+				common_msgs::ParameterList parameter_list;
+				parameter_list.parameter_list=executable_actions_[i].parameters;
+				srv.request.parameters=parameter_list;
+				if (action_postconditions_services_.at(action_name).call(srv)) {
+					actions_to_execute.actions.push_back(executable_actions_[i]);
 				}
 				else {
-					if (srv.response.result.size()>0 && srv.response.result[0].value.size()>0) {
-						setObjectDistance(human,object,boost::lexical_cast<double>(srv.response.result[0].value[0]));
-					}
+					ROS_WARN("ACTION_MONITORS failed to set postconditions for action %s",action_name.c_str());
 				}
 			}
 		}
+		executed_actions_pub_.publish(actions_to_execute);
 		r.sleep();
 	}
 }
-
-void ActionMonitors::setHumanObject(string human,string object) {
-	boost::lock_guard<boost::mutex> lock(mutex_human_objects_);
-	human_objects_[human]=object;
-}
-
-string ActionMonitors::getHumanObject(string human) {
-	boost::lock_guard<boost::mutex> lock(mutex_human_objects_);
-	return human_objects_[human];
-}
-
-void ActionMonitors::setObjectDistance(string human, string object, double distance) {
-	boost::lock_guard<boost::mutex> lock(mutex_object_distance_);
-	std::pair<string,string> p(human,object);
-	object_distances_[p]=distance;
-}
-
-double ActionMonitors::getObjectDistance(string human,string object) {
-	boost::lock_guard<boost::mutex> lock(mutex_object_distance_);
-	std::pair<string,string> p(human,object);
-	return object_distances_[p];
-}
-
-
-
-void ActionMonitors::monitorLoop() {
-	ros::Rate r(3);
-
-	while (ros::ok()) {
-		situation_assessment_actions_msgs::ExecutableActions executable_actions_msg;
-
-		for (int i=0; i<object_list_.size();i++) {
-			//For each object
-
-			string object=object_list_[i];
-			vector<string> affordances=object_affordances_[object];
-			for (int j=0;j<affordances.size();j++) {
-				//let's consider every affordance of the object (e.g. every action that can be done on it)
-
-				string action=affordances[j];
-				for (int k=0;k<human_list_.size();k++) {
-
-
-					//for each human we will check if the preconditions of this action are satisfied
-
-					string human=human_list_[k];
-					common_msgs::ParameterList parameter_list;
-					common_msgs::Parameter target_parameter;
-					//we set the parameters
-					target_parameter.name="target";
-					target_parameter.value=object;
-					parameter_list.parameter_list.push_back(target_parameter);
-					string human_object=getHumanObject(human);
-					//if he has an object we consider it has parameter of the action (since with our mocap
-					//humans can only have one hand. When they have an object they need to use it somewhere
-					//or place it)
-					if (human_object!="") {
-						common_msgs::Parameter object_parameter;
-						object_parameter.name="object";
-						object_parameter.value=human_object;
-						parameter_list.parameter_list.push_back(object_parameter);
-					}
-
-					action_management_msgs::CheckPreconditions preconditions_msg;
-					preconditions_msg.request.parameters=parameter_list;
-					//check the preconditions
-					if (action_preconditions_services_[action].call(preconditions_msg)) {
-						if (preconditions_msg.response.value==true) {
-							//if they are satisfied compare distance between hand an object to trigger
-							double hand_distance=getObjectDistance(human,object);
-							if (hand_distance<trigger_distance_) {
-								//if it's less set the postconditions of the action and publish that the action has been done
-								action_management_msgs::SetPostconditions postconditions_msg;
-								postconditions_msg.request.parameters=parameter_list;
-								if (action_postconditions_services_[action].call(postconditions_msg)) {
-									action_management_msgs::Action action_msg;
-									action_msg.name=action;
-									action_msg.parameters=parameter_list.parameter_list;
-									human_action_topics_[human].publish(action_msg);
-									ROS_INFO("ACTION_MONITORS agent %s completed action %s %s %s",human.c_str(),action.c_str(),human_object.c_str(),object.c_str());
-								}
-								else {
-									ROS_ERROR("ACTION_MONITORS failed to set postconditions for action %s",action.c_str());
-								}
-							}
-							else { //if the action was not executed add it to the list of executable actions
-								action_management_msgs::Action action_msg;
-								action_msg.name=action;
-								action_msg.parameters=parameter_list;
-								executable_actions_msg.executable_actions.push_back(action_msg);
-							}
-						}	
-					}
-					else {
-						ROS_ERROR("ACTION_MONITORS failed to check preconditions for action %s",action.c_str());
-					}
-				}
-			}
-		}
-		executed_actions_pub_.publish(executable_actions_msg);
-		r.sleep();
-	}
-
-}
-
-
-
