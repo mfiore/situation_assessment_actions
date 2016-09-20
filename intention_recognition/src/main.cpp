@@ -35,6 +35,10 @@ like (agent isAt *)
 //- correcting divergent belief
 //- adding parameters to MDPs
 
+typedef std::vector<std::string> StringVector;
+typedef std::vector<double> DoubleVector;
+typedef std::pair<std::string,std::string>  StringPair;
+
 
 std::map<std::string,IntentionGraph*> agents_intentions_; //links an Intention Graph to each agent
 
@@ -135,6 +139,9 @@ bool startMonitoring(situation_assessment_actions_msgs::StartMonitorIntentions::
     std::vector<IntentionNode> intention_nodes;
     std::vector<Mdp*> mdps;
 
+    std::map<std::string,std::string> mdp_parameters;
+    mdp_parameters["agent"]=req.agent;
+
     //create intention nodes and mdp vector
     for (std::string intention:req.intentions) {
     	if (mdp_map_.find(intention)==mdp_map_.end()) {
@@ -152,10 +159,12 @@ bool startMonitoring(situation_assessment_actions_msgs::StartMonitorIntentions::
     	intention_nodes.push_back(i);
 
     	Mdp* m=mdp_map_.at(intention);
+    	m->assignParameters(mdp_parameters);
+
     	//check if every intention is present
 
 		mdps.push_back(m);   	
-    }
+    }   
     std::map<std::string,std::string> initial_state=getInitialState(req.agent,mdps);
     IntentionGraph ig;
     ig.setGraph(contexts,intention_nodes,req.actions,mdps,initial_state);
@@ -189,14 +198,20 @@ std::map<std::string,std::string> getEvidence(std::string agent, IntentionGraph*
 	return evidence;
 }
 
+void loadContexts(ros::NodeHandle *node_handle) {
+
+}
 
 //loads all the known MDPs, by reading their model files
 void loadMdp(ros::NodeHandle *node_handle) {
 	std::vector<std::string> intention_list;
-	node_handle->getParam("/situation_assessment/actions/intention_list",intention_list);
+	node_handle->getParam("/situation_assessment/intention_recognition/intention_list",intention_list);
 	for (std::string i : intention_list) {
+		ROS_INFO("INTENTION_RECOGNITION - intention %s",i.c_str());
 		std::string mdp_path;
-		node_handle->getParam("/situation_assessment/actions/intention_list/"+i+"/mdp_path",mdp_path);
+		node_handle->getParam("/situation_assessment/intention_recognition/intention_details/"+i+"/mdp_path",mdp_path);
+
+		ROS_INFO("INTENTION_RECOGNITION - mdp_path is %s",mdp_path.c_str());
 
 		Mdp intention_mdp;
 		bool ok=intention_mdp.readMdp(mdp_path);
@@ -207,12 +222,29 @@ void loadMdp(ros::NodeHandle *node_handle) {
 			ROS_INFO("INTENTION_RECOGNITION - Adding MDP for intention %s with path %s",i.c_str(),mdp_path.c_str());
 			mdp_map_[i]=&intention_mdp;
 		}
-	}
 
+		StringVector contexts;
+		node_handle->getParam("/situation_assessment/intention_recognition/intention_details/"+i+"/linked_contexts",
+			contexts);
+		linked_contexts_[i]=contexts;
+		for (string c:contexts) {
+			ROS_INFO("INTENTION_RECOGNITION - context %s",c.c_str());
+			double influence;
+			node_handle->getParam("/situation_assessment/intention_recognition/intention_details/"+i+
+				"/context_probabilities/"+c,influence);
+
+			ROS_INFO("INTENTION_RECOGNITION - influence is %f",influence);
+
+			StringPair p;
+			p.first=i;
+			p.second=c;
+			intention_conditional_probabilities_[p]=influence;
+		}
+	}
 }
 
 int main(int argc, char ** argv) {
-	ros::init(argc,argv,"situation_assessment/intention_recognition");
+	ros::init(argc,argv,"intention_recognition");
 
 	ROS_INFO("INTENTION_RECOGNITION - started node");
 

@@ -1,7 +1,8 @@
 <launch>
   <include file="$(find simple_agent_monitor)/launch/simple_agent_monitor.launch" />
-  <node name="action_preconditions_checker" pkg="action_preconditions_checker" type="action_preconditions_checker" output="screen"/>
-  <node name="basic_actions" pkg="action_nodes" type="basic_actions" />
-  <node name="human_action_monitor" pkg="human_action_monitor" type="human_action_monitor" output="screen" />
+  <!-- <node name="action_preconditions_checker" pkg="action_preconditions_checker" type="action_preconditions_checker" output="screen"/> -->
+  <!-- <node name="basic_actions" pkg="action_nodes" type="basic_actions" /> -->
+  <!-- <node name="human_action_monitor" pkg="human_action_monitor" type="human_action_monitor" output="screen" /> -->
+  <node name="intention_recognition" pkg="intention_recognition" type="intention_recognition" output="screen" />
 
 </launch>
