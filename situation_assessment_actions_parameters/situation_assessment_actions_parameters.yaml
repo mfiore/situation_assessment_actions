@@ -1,0 +1,52 @@
+---
+situation_assessment:
+  action_monitoring:
+    use_database: true
+    trigger_distance: 0.5
+    actions_to_monitor:
+      - pick    
+      - place
+      - move
+      - fill
+    actions_details:
+      pick:
+        target: main_object
+        monitor_part: hand
+      place:
+        target: target
+        monitor_part: hand
+    affordances:
+      waterbottle:
+        - pick
+      teabottle:
+        - pick
+      mug:
+        - pick
+        - fill
+      table:
+        - place
+      shelf1:
+        - place
+      shelf2:
+        - place
+      shelf3:
+        - place
+      sidetable:
+        - place
+  intention_recognition:
+    intention_list:
+      - drink_water
+    # - drink_tea
+    intention_details:
+      drink_water:
+        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_water
+        linked_contexts:
+          - hot_day
+        context_probabilities:
+          hot_day: 0.7
+          # drink_tea:
+          #     mdp_path: home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_tea
+          #     linked_contexts:
+          #         - cold_day
+          #     context_probabilities:
+          #         cold_day: 0.7

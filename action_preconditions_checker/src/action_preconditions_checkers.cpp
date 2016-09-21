@@ -55,6 +55,7 @@ ActionPreconditionsChecker::ActionPreconditionsChecker(ros::NodeHandle node_hand
 		ROS_INFO("ACTION_PRECONDITIONS_CHECKER - waiting for action %s",actions_to_monitor_[i].c_str());
 		client_preconditions.waitForExistence();
 		action_preconditions_services_[actions_to_monitor_[i]]=client_preconditions;
+		ROS_INFO("ACTION_PRECONDITIONS_CHECKER - connected");
 	}
 	ROS_INFO("ACTION_PRECONDITIONS_CHECKER connected to action services");
 
@@ -104,8 +105,8 @@ void ActionPreconditionsChecker::agentFactCallback(const situation_assessment_ms
 }
 
 void ActionPreconditionsChecker::databaseLoop() {
-	ros::Rate r(3);
-	while (ros::ok()) {
+	// ros::Rate r(3);
+	// while (ros::ok()) {
 		situation_assessment_msgs::QueryDatabase srv;
 		for (int i=0;i<human_list_.size();i++) {
 			std::string human=human_list_[i];
@@ -127,17 +128,17 @@ void ActionPreconditionsChecker::databaseLoop() {
 
 		
 		}
-		r.sleep();
-	}
+		// r.sleep();
+	// }
 }
 
 void ActionPreconditionsChecker::start() {
-	if (use_database_) {
-		databaseLoop();
-	}
-	else {
+	// if (use_database_) {
+	// 	databaseLoop();
+	// }
+	// else {
 		monitorLoop();
-	}
+	// }
 }
 
 
@@ -156,7 +157,12 @@ std::string ActionPreconditionsChecker::getHumanObject(std::string human) {
 void ActionPreconditionsChecker::monitorLoop() {
 	ros::Rate r(3);
 
+
 	while (ros::ok()) {
+		if (use_database_) {
+			databaseLoop();
+		}
+
 		situation_assessment_actions_msgs::ExecutableActions executable_actions_msg;
 		for (int i=0; i<object_list_.size();i++) {
 			//For each object
@@ -167,7 +173,6 @@ void ActionPreconditionsChecker::monitorLoop() {
 
 				std::string action=affordances[j];
 				for (int k=0;k<human_list_.size();k++) {
-
 
 					//for each human we will check if the preconditions of this action are satisfied
 
@@ -187,6 +192,7 @@ void ActionPreconditionsChecker::monitorLoop() {
 					//humans can only have one hand. When they have an object they need to use it somewhere
 					//or place it)
 					if (human_object!="") {
+						ROS_INFO("HUMAN HAS AN OBJECT");
 						common_msgs::Parameter object_parameter;
 						object_parameter.name="main_object";
 						object_parameter.value=human_object;
