@@ -23,8 +23,10 @@ This class is used to monitor human actions.
 #include <situation_assessment_msgs/FactList.h>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/locks.hpp>
+#include <boost/thread/thread.hpp>
 #include <boost/lexical_cast.hpp>
 
+#include "supervision_timer/supervision_timer.h"
 
 
 using namespace std;
@@ -72,6 +74,10 @@ private:
 	std::map<std::string,std::string> action_monitor_parts_;
 	std::map<std::string,std::string> action_targets_;
 
+	double time_threshold_;
+
+	std::map<std::string,SupervisionTimer*> agent_timers_;
+	std::map<std::string,boost::thread*> timers_threads_; 
 };
 
 

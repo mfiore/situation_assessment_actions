@@ -191,8 +191,7 @@ void ActionPreconditionsChecker::monitorLoop() {
 					//if he has an object we consider it has parameter of the action (since with our mocap
 					//humans can only have one hand. When they have an object they need to use it somewhere
 					//or place it)
-					if (human_object!="") {
-						ROS_INFO("HUMAN HAS AN OBJECT");
+					if (human_object!="" && action_targets_.at(action)!="main_object") {
 						common_msgs::Parameter object_parameter;
 						object_parameter.name="main_object";
 						object_parameter.value=human_object;

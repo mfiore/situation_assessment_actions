@@ -6,8 +6,10 @@ ActionMonitors::ActionMonitors(ros::NodeHandle node_handle):node_handle_(node_ha
 	node_handle_.getParam("/situation_assessment/action_monitoring/actions_to_monitor",actions_to_monitor_);
 	node_handle_.getParam("/situation_assessment/action_monitoring/trigger_distance",trigger_distance_);
 	node_handle_.getParam("/situation_assessment/action_monitoring/use_database",use_database_);
+	node_handle_.getParam("/situation_assessment/action_monitoring/temporal_threshold",time_threshold_);
 
 	ROS_INFO("HUMAN_ACTION_MONITOR robot %s",robot_name_.c_str());
+	ROS_INFO("HUMAN_ACTION_MONITOR temporal temporal_threshold is %f",time_threshold_);
 	ROS_INFO("HUMAN_ACTION_MONITOR actions to monitor:");
 	for (int i=0;i<actions_to_monitor_.size();i++) {
 		ROS_INFO("HUMAN_ACTION_MONITOR - %s",actions_to_monitor_[i].c_str());
@@ -104,22 +106,50 @@ void ActionMonitors::actionLoop() {
 			string action_target=parameters.at(t);
 			string agent=parameters.at("main_agent");
 
+			if (agent_timers_.find(agent)==agent_timers_.end()) {
+				agent_timers_[agent]=new SupervisionTimer(time_threshold_);
+			}
+
+
 			string monitor_part=action_monitor_parts_.at(action_name);
 			double distance=getDistance(agent,action_target,monitor_part);
 			if (distance<trigger_distance_) {
-				action_management_msgs::SetPostconditions srv;
-				common_msgs::ParameterList parameter_list;
-				parameter_list.parameter_list=executable_actions_[i].parameters;
-				srv.request.parameters=parameter_list;
-				if (action_postconditions_services_.at(action_name).call(srv)) {
-					actions_to_execute.actions.push_back(executable_actions_[i]);
+				if (!agent_timers_.at(agent)->isRunning()) {
+					if (timers_threads_.find(agent)!=timers_threads_.end()) {
+						delete timers_threads_.at(agent);
+						timers_threads_[agent]=NULL;
+					}
+
+					action_management_msgs::SetPostconditions srv;
+					common_msgs::ParameterList parameter_list;
+					parameter_list.parameter_list=executable_actions_[i].parameters;
+					srv.request.parameters=parameter_list;
+					if (action_postconditions_services_.at(action_name).call(srv)) {
+						actions_to_execute.actions.push_back(executable_actions_[i]);
+						timers_threads_[agent]=new boost::thread(boost::bind(&SupervisionTimer::start,
+							agent_timers_.at(agent)));
+							// agent_timers_[agent]->start();
+						// SupervisionTimer s(3);
+						// s.start();
+					}
+					else {
+						ROS_WARN("ACTION_MONITORS failed to set postconditions for action %s",action_name.c_str());
+					}
 				}
 				else {
-					ROS_WARN("ACTION_MONITORS failed to set postconditions for action %s",action_name.c_str());
+					// ROS_INFO("TIMER IS RUNNING");
 				}
 			}
 		}
 		executed_actions_pub_.publish(actions_to_execute);
 		r.sleep();
+	}
+	for (auto tt:timers_threads_) {
+		agent_timers_.at(tt.first)->stop();
+		tt.second->join();
+		if (tt.second!=NULL) {
+			delete tt.second;
+		}
+		delete agent_timers_.at(tt.first);
 	}
 }

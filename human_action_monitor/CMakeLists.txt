@@ -23,6 +23,7 @@ find_package(catkin REQUIRED COMPONENTS
   action_management_msgs
   common_msgs
   situation_assessment_msgs
+  supervision_timer
 )
 
 ## System dependencies are found with CMake's conventions

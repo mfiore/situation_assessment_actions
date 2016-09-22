@@ -1,6 +1,7 @@
 ---
 situation_assessment:
   action_monitoring:
+    temporal_threshold: 3
     use_database: true
     trigger_distance: 0.5
     actions_to_monitor:
@@ -13,6 +14,9 @@ situation_assessment:
         target: main_object
         monitor_part: hand
       place:
+        target: target
+        monitor_part: hand
+      fill:
         target: target
         monitor_part: hand
     affordances:
