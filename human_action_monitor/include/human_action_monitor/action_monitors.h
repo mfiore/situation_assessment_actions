@@ -8,6 +8,7 @@ This class is used to monitor human actions.
 #include <string>
 #include <vector>
 #include <utility>
+#include <set>
 
 #include <action_management_msgs/Action.h>
 #include <action_management_msgs/ActionList.h>
@@ -18,6 +19,7 @@ This class is used to monitor human actions.
 
 #include <situation_assessment_msgs/QueryDatabase.h>
 #include <situation_assessment_actions_msgs/ExecutableActions.h>
+#include <situation_assessment_actions_msgs/ExecutableAgentActions.h>
 
 
 #include <situation_assessment_msgs/FactList.h>
@@ -27,7 +29,6 @@ This class is used to monitor human actions.
 #include <boost/lexical_cast.hpp>
 
 #include "supervision_timer/supervision_timer.h"
-
 
 using namespace std;
 
@@ -39,9 +40,14 @@ private:
 
 	void executableActionsCallback(
 	 	const situation_assessment_actions_msgs::ExecutableActions::ConstPtr& msg);
+	// void ActionMonitors::inferenceCallback(
+		// const situation_assessment_actions_msgs::IntentionGraphResult::ConstPtr& msg);
 	std::map<std::string,std::string> getParameterMap(
 		std::vector<common_msgs::Parameter> parameter_message);
 	double getDistance(string agent, string target, string monitor_part);
+
+
+	std::vector<action_management_msgs::Action> getMoveActions();
 
 
 	ros::NodeHandle node_handle_; 
@@ -49,7 +55,7 @@ private:
 	ros::Subscriber fact_subscriber_; //used if we are looping on a topic to get observations
 
 	ros::Subscriber executable_actions_subscriber_;
-	vector<action_management_msgs::Action> executable_actions_;  
+	vector<situation_assessment_actions_msgs::ExecutableAgentActions> executable_actions_;  
 	vector<std::string> actions_to_monitor_;
 
 	ros::Publisher executed_actions_pub_;
@@ -61,6 +67,8 @@ private:
 	//values read from parameters
 	vector<string> object_list_;
 	map<string,vector<string> > object_affordances_; //links an object to possible actions
+	vector<string> human_list_;
+	map<string,vector<string> > human_locations_;
 
 
 	double trigger_distance_;  //trigger for deciding that an action is done
@@ -78,6 +86,8 @@ private:
 
 	std::map<std::string,SupervisionTimer*> agent_timers_;
 	std::map<std::string,boost::thread*> timers_threads_; 
+
+	ros::Subscriber inference_sub_;
 };
 
 

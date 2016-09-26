@@ -163,7 +163,8 @@ void ActionPreconditionsChecker::monitorLoop() {
 			databaseLoop();
 		}
 
-		situation_assessment_actions_msgs::ExecutableActions executable_actions_msg;
+		std::map<std::string,std::vector<action_management_msgs::Action> > agent_actions;
+
 		for (int i=0; i<object_list_.size();i++) {
 			//For each object
 			std::string object=object_list_[i];
@@ -207,7 +208,7 @@ void ActionPreconditionsChecker::monitorLoop() {
 							action_management_msgs::Action action_msg;
 							action_msg.name=action;
 							action_msg.parameters=parameter_list.parameter_list;
-							executable_actions_msg.executable_actions.push_back(action_msg);
+							agent_actions[human].push_back(action_msg);
 						}	
 					}
 					else {
@@ -215,6 +216,13 @@ void ActionPreconditionsChecker::monitorLoop() {
 					}
 				}
 			}
+		}
+		situation_assessment_actions_msgs::ExecutableActions executable_actions_msg;
+		for (auto aa:agent_actions) {
+			situation_assessment_actions_msgs::ExecutableAgentActions agent_actions_msg;
+			agent_actions_msg.agent=aa.first;
+			agent_actions_msg.actions=aa.second;
+			executable_actions_msg.executable_agents_actions.push_back(agent_actions_msg);
 		}
 		human_executable_actions_pub_.publish(executable_actions_msg);
 		r.sleep();

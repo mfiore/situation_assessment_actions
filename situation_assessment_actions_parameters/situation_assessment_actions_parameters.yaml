@@ -7,7 +7,6 @@ situation_assessment:
     actions_to_monitor:
       - pick    
       - place
-      - move
       - fill
     actions_details:
       pick:

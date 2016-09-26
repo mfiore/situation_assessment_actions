@@ -1,2 +1,2 @@
 string agent
-string[] actions
+action_management_msgs/Action[] actions

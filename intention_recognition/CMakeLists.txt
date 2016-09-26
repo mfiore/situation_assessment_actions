@@ -123,7 +123,7 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-#include
+  include
   ${catkin_INCLUDE_DIRS}
   ${boost_INCLUDE_DIRS}
   $ENV{MDP_DIR}
@@ -142,7 +142,10 @@ include_directories(
 # add_dependencies(intention_recognition ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
- add_executable(intention_recognition src/main.cpp)
+ add_executable(intention_recognition src/intention_recognition.cpp src/observations_collector.cpp
+ src/main.cpp
+ #include/intention_recognition/string_operations.h
+ )
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
@@ -153,7 +156,7 @@ situation_assessment_msgs_generate_messages_cpp situation_assessment_actions_msg
  target_link_libraries(intention_recognition
    ${catkin_LIBRARIES}
     $ENV{MDP_DIR}/dist/Debug/GNU-Linux/libpomdp.so
-    $ENV{IG_DIR}/dist/Debug/GNU-Linux/libIntentionGraph.so
+    $ENV{IG_DIR}/dist/Debug/GNU-Linux/libintention_graph.so
  )
 
 #############

@@ -13,6 +13,7 @@
 #include <action_management_msgs/CheckPreconditions.h>
 #include <action_management_msgs/SetPostconditions.h>
 #include <situation_assessment_actions_msgs/ExecutableActions.h>
+#include <situation_assessment_actions_msgs/ExecutableAgentActions.h>
 
 #include <situation_assessment_msgs/QueryDatabase.h>
 #include <situation_assessment_msgs/FactList.h>
