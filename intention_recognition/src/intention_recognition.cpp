@@ -64,6 +64,9 @@ IntentionRecognition::IntentionRecognition(ros::NodeHandle node_handle):node_han
 
 
 void IntentionRecognition::createIntentionGraph(std::string agent, std::vector<std::string> actions) {
+		boost::lock_guard<boost::mutex> lock(mutex_igs_);
+
+
 	    std::vector<IntentionNode> intention_nodes;
 	    std::vector<Mdp*> mdps;
 
@@ -95,13 +98,10 @@ void IntentionRecognition::createIntentionGraph(std::string agent, std::vector<s
 	    }   
 	    std::map<std::string,std::string> initial_state=observations_collector_.getInitialState(agent,mdps);
 	    IntentionGraph ig;
-	    ig.setGraph(contexts_,intention_nodes,getAgentActions(agent),mdps,initial_state);
+	    ig.setGraph(contexts_,intention_nodes,actions,mdps,initial_state);
 	    agents_intentions_[agent]=&ig;
 }
 
-std::vector<std::string> IntentionRecognition::getAgentActions(std::string agent){
-	return std::vector<std::string>();
-}
 
 //creates an IG for an agent
 bool IntentionRecognition::startMonitoring(situation_assessment_actions_msgs::StartMonitorIntentions::Request &req,
@@ -110,9 +110,94 @@ bool IntentionRecognition::startMonitoring(situation_assessment_actions_msgs::St
 
 }
 
+std::string IntentionRecognition::createActionString(action_management_msgs::Action a) {
+	std::string action_string;
+	std::string agent="";
+	std::string target="";
+	std::string object="";
+	std::vector<common_msgs::Parameter> parameters=a.parameters; 
+	for (int i=0; i<parameters.size(); i++) {
+		if (parameters[i].name=="main_agent") {
+			agent=parameters[i].value;
+		}
+		else if (parameters[i].name=="main_object") {
+			object=parameters[i].value;
+		}
+		else if (parameters[i].name=="target") {
+			target=parameters[i].value;
+		}
+	}
+	if (target==""){
+		action_string=agent+"_"+a.name+"_"+object;
+	}
+	else if (object=="") {
+		action_string=agent+"_"+a.name+"_"+target;	
+	}
+	else {
+		action_string=agent+"_"+a.name+"_"+object+"_"+target;	
+	}
+	return action_string;
+}
 
+//tips to make it better:
+// publishing executable actions only when there is a difference
+// linking a code to the message to say if its difference
+// publishing another topic to inform of the difference
+// making this a service
 void IntentionRecognition::actionCallback(const situation_assessment_actions_msgs::ExecutableActions::ConstPtr& msg) {
- 	
+	
+	std::map<std::string,std::vector<action_management_msgs::Action> > agents_to_recreate; 
+	for (int i=0;i<msg->executable_agents_actions.size();i++) {
+		string agent=msg->executable_agents_actions[i].agent;
+		std::vector<action_management_msgs::Action> new_actions=msg->executable_agents_actions[i].actions;
+		if (executable_actions_.find(agent)==executable_actions_.end()) {
+			executable_actions_[agent]=new_actions;
+		}
+		else {
+			std::vector<action_management_msgs::Action> old_actions=executable_actions_.at(agent);
+			if (new_actions.size()!=old_actions.size()) {
+				agents_to_recreate[agent]=new_actions;
+			}			
+			else {
+				bool found_difference=false;
+				int j=0;
+				while (j<new_actions.size() && !found_difference) {
+					if (old_actions[j].name!=new_actions[j].name) {
+						found_difference=true;
+						break;
+					}
+					else {
+						std::vector<common_msgs::Parameter> old_parameters=old_actions[j].parameters;
+						std::vector<common_msgs::Parameter> new_parameters=new_actions[j].parameters;
+						if (old_parameters.size()!=new_parameters.size()) {
+							found_difference=true;
+							break;
+						}
+						else {
+							for (int k=0;k<old_parameters.size();k++) {
+								if (old_parameters[k].name!=new_parameters[k].name ||
+									old_parameters[k].value!=new_parameters[k].value) {
+									found_difference=true;
+								break;
+								}
+							}
+						}
+					}
+					j++;		
+				}
+				if (found_difference) {
+					agents_to_recreate[agent]=new_actions;
+				}
+			}
+		}
+	}
+ 	for (auto a:agents_to_recreate) {
+ 		std::vector<std::string> action_strings;
+ 		for (int i=0;i<a.second.size();i++) {
+ 			action_strings.push_back(createActionString(a.second[i]));
+ 		}
+ 		createIntentionGraph(a.first,action_strings);
+ 	}
 }
 
 
@@ -129,7 +214,7 @@ void IntentionRecognition::intentionLoop(){
 			std::map<std::string,std::string> evidence=observations_collector_.getEvidence(ig.first,ig.second);
 			std::map<std::string,double> agent_probability=ig.second->computeProbability(evidence);
 			
-			std::vector<string> agent_actions=getAgentActions(ig.first);
+			std::vector<string> agent_actions=ig.second->getActionNodes();
 			agent_inference_msg.actions=agent_actions;
 			for (std::string a:agent_actions) {
 				agent_inference_msg.actions_prob.push_back(agent_probability.at(a));
@@ -150,5 +235,7 @@ void IntentionRecognition::intentionLoop(){
 }
 
 std::map<std::string,IntentionGraph*> IntentionRecognition::getIntentionGraphs() {
+	boost::lock_guard<boost::mutex> lock(mutex_igs_);
+
 	return agents_intentions_;
 }

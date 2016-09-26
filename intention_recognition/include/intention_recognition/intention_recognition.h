@@ -9,6 +9,14 @@
 #include  "situation_assessment_actions_msgs/IntentionGraphResult.h"
 #include "IntentionGraph.h"
 #include "Mdp.h"
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/locks.hpp> 
+#include <boost/thread/lock_guard.hpp> 
+#include <set>
+#include <vector>
+#include <string>
+#include <map>
+
 
 typedef std::vector<std::string> StringVector;
 typedef std::pair<std::string,std::string> StringPair;
@@ -16,6 +24,10 @@ typedef std::pair<std::string,std::string> StringPair;
 class IntentionRecognition {
 public:
 	IntentionRecognition(ros::NodeHandle node_handle);
+	void intentionLoop();
+
+private:
+
 	//creates an IG for an agent
 	bool startMonitoring(situation_assessment_actions_msgs::StartMonitorIntentions::Request &req,
 		situation_assessment_actions_msgs::StartMonitorIntentions::Response &res);
@@ -25,14 +37,13 @@ public:
 
 	void actionCallback(const situation_assessment_actions_msgs::ExecutableActions::ConstPtr& msg);
 
-	void intentionLoop();
 
 	void createIntentionGraph(std::string agent,std::vector<std::string> actions);
 
-	std::vector<std::string> getAgentActions(std::string agent);
+	std::string createActionString(action_management_msgs::Action a);
+
 	std::map<std::string,IntentionGraph*> getIntentionGraphs();
 
-public:
 	ros::NodeHandle node_handle_;
 	ObservationsCollector observations_collector_;
 
@@ -49,6 +60,10 @@ public:
 
 	ros::Publisher pub_intentions_;
 
+
+	boost::mutex mutex_igs_;
+
+	std::map<std::string,std::vector<action_management_msgs::Action> > executable_actions_;
 
 };
 #endif

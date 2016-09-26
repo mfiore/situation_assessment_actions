@@ -19,6 +19,9 @@ like (agent isAt *)
 
 #include <ros/ros.h>
 #include "intention_recognition/intention_recognition.h"
+#include <vector>
+#include <string>
+#include <utility>
 
 //steps
 //- recognizing intentions with action stream
