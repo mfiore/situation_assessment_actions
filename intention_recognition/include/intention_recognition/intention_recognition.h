@@ -64,6 +64,8 @@ private:
 	boost::mutex mutex_igs_;
 
 	std::map<std::string,std::vector<action_management_msgs::Action> > executable_actions_;
-
+	std::vector<std::string> locations_;
+	std::vector<std::string> humans_;
+	std::map<std::string,std::vector<std::string> > move_actions_;  
 };
 #endif

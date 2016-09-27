@@ -7,6 +7,7 @@ situation_assessment:
     actions_to_monitor:
       - pick    
       - place
+      - move
       - fill
     actions_details:
       pick:
@@ -40,8 +41,6 @@ situation_assessment:
     intention_list:
       - drink_water
     # - drink_tea
-    contexts:
-      - hot_day
     intention_details:
       drink_water:
         mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_water
@@ -55,5 +54,3 @@ situation_assessment:
           #         - cold_day
           #     context_probabilities:
           #         cold_day: 0.7
-
-

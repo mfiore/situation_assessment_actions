@@ -156,7 +156,7 @@ situation_assessment_msgs_generate_messages_cpp situation_assessment_actions_msg
  target_link_libraries(intention_recognition
    ${catkin_LIBRARIES}
     $ENV{MDP_DIR}/dist/Debug/GNU-Linux/libpomdp.so
-    $ENV{IG_DIR}/dist/Debug/GNU-Linux/libintention_graph.so
+    $ENV{IG_DIR}/dist/Debug/GNU-Linux/libIntentionGraph.so
  )
 
 #############
