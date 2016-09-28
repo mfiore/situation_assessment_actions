@@ -122,50 +122,30 @@ std::vector<action_management_msgs::Action> ActionMonitors::getMoveActions() {
 
 	situation_assessment_msgs::QueryDatabase query_location;
 	query_location.request.query.model=robot_name_;
-	query_location.request.query.predicate.push_back("isInArea");
+	query_location.request.query.predicate.push_back("isAt");
 
-	if (database_query_client_.call(query_location) &&
-		query_location.response.result.size()>0) {
+	if (database_query_client_.call(query_location)) {
+		for (int i=0;i<query_location.response.result.size();i++) {
+			string entity=query_location.response.result[i].subject;
+			if (human_locations_.find(entity)!=human_locations_.end()) {
+				if (query_location.response.result[i].value.size()>0) {
+					string new_location=query_location.response.result[i].value[0];
+					if (new_location!=human_locations_.at(entity)) {
+						human_locations_[entity]=new_location;
+						action_management_msgs::Action action;
+						action.name="move";
 
-		for (int i=0; i<query_location.response.result.size(); i++) {
-			situation_assessment_msgs::Fact fact_location=query_location.response.result[i];
-			if (human_locations_.find(fact_location.subject)!=human_locations_.end()) {
-				std::vector<std::string>  previous_locations=human_locations_.at(fact_location.subject);
-				std::vector<std::string>  new_locations=fact_location.value;
-
-				string different="";
-
-				if (new_locations.size()<previous_locations.size()) {
-					for (string l:previous_locations) {
-						if (l!="this" && std::find(new_locations.begin(),new_locations.end(),l)==new_locations.end()) {
-							different=l;
-						}
+						common_msgs::Parameter agent_par,target_par;
+						agent_par.name="main_agent";
+						agent_par.value=entity;
+						target_par.name="target";
+						target_par.value=new_location;
+						
+						action.parameters={agent_par,target_par};
+						move_actions.push_back(action);
 					}
 				}
-				else {
-					for (string l:new_locations) {
-						if (std::find(previous_locations.begin(),previous_locations.end(),l)==previous_locations.end()) {
-							different=l;
-							break;
-						}
-					}
-				}
-				if (different!="") {
-					human_locations_[fact_location.subject]=new_locations;
-					action_management_msgs::Action action;
-					action.name="move";
-
-					common_msgs::Parameter agent_par,target_par;
-					agent_par.name="main_agent";
-					agent_par.value=fact_location.subject;
-					target_par.name="target";
-					target_par.value=different;
-				
-					action.parameters={agent_par,target_par};
-					move_actions.push_back(action);
-				}
-
-			}
+			} 
 		}
 	}
 	else {
@@ -180,6 +160,7 @@ void ActionMonitors::actionLoop() {
 		ros::spinOnce();
 		action_management_msgs::ActionList actions_to_execute;
 		std::vector<action_management_msgs::Action> eligible_actions=getMoveActions(); //we start considering move actions and then update it with other actions
+
 		std::map<std::string, double>  min_distance_targets;
 		std::set<std::string>  already_acted; //includes agent that have moved (that's their action for this time instance)
 
@@ -191,37 +172,42 @@ void ActionMonitors::actionLoop() {
 			std::vector<action_management_msgs::Action> agent_actions=executable_actions_[i].actions;
 			for (int j=0; j<agent_actions.size();j++) {
 				string action_name=agent_actions[j].name;
-				std::map<std::string,std::string> parameters=getParameterMap(agent_actions[j].parameters);
-				string t=action_targets_.at(action_name);
-				string action_target=parameters.at(t);
-				string agent=parameters.at("main_agent");
+				if (action_name!="move") {
+					std::map<std::string,std::string> parameters=getParameterMap(agent_actions[j].parameters);
+					string t=action_targets_.at(action_name);
+					string action_target=parameters.at(t);
+					string agent=parameters.at("main_agent");
 
-				if (already_acted.find(agent)==already_acted.end()) {
-		
-					string monitor_part=action_monitor_parts_.at(action_name);
-					double distance=getDistance(agent,action_target,monitor_part);
-					if (distance<trigger_distance_) {
-						//prune action if there is a closer object
-						//the if contains in the first part a check to see if there are already objects found for
-						//the agent whose distance is < than trigger and, in that case, if the object of this
-						//action is closer
-						//the second part just checks if there is no object already found
-						if (
-							(min_distance_targets.find(agent)!=min_distance_targets.end()
-							&& distance<min_distance_targets.at(agent)) ||
-							min_distance_targets.find(agent)==min_distance_targets.end()
-							) {
-								min_distance_targets[agent]=distance;
-								eligible_actions.push_back(agent_actions[i]);
-						} 
-					}		
+					if (already_acted.find(agent)==already_acted.end()) {
+			
+						string monitor_part=action_monitor_parts_.at(action_name);
+						double distance=getDistance(agent,action_target,monitor_part);
+						if (distance<trigger_distance_) {
+							//prune action if there is a closer object
+							//the if contains in the first part a check to see if there are already objects found for
+							//the agent whose distance is < than trigger and, in that case, if the object of this
+							//action is closer
+							//the second part just checks if there is no object already found
+							if (
+								(min_distance_targets.find(agent)!=min_distance_targets.end()
+								&& distance<min_distance_targets.at(agent)) ||
+								min_distance_targets.find(agent)==min_distance_targets.end()
+								) {
+									min_distance_targets[agent]=distance;
+									ROS_INFO("Adding an action %s",agent_actions[j].name.c_str());
+									eligible_actions.push_back(agent_actions[j]);
+							} 
+						}		
+					}
 				}
 
 			}
 		}
+		// ROS_INFO("New action cycle");
 		std::map<std::string,double> distance_for_agent;
 		for (int i=0; i<eligible_actions.size(); i++) {
 			string action_name=eligible_actions[i].name;
+			// ROS_INFO("action is %s",action_name.c_str());
 			std::map<std::string,std::string> parameters=getParameterMap(eligible_actions[i].parameters);
 			string agent=parameters.at("main_agent");
 

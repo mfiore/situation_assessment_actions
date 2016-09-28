@@ -67,5 +67,6 @@ private:
 	std::vector<std::string> locations_;
 	std::vector<std::string> humans_;
 	std::map<std::string,std::vector<std::string> > move_actions_;  
+	std::map<std::string,std::string> human_locations_;
 };
 #endif

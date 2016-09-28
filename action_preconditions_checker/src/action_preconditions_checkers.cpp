@@ -6,6 +6,7 @@ ActionPreconditionsChecker::ActionPreconditionsChecker(ros::NodeHandle node_hand
 	node_handle_.getParam("/situation_assessment/object_names",object_list_);
 	node_handle_.getParam("/situation_assessment/action_monitoring/use_database",use_database_);
 	node_handle_.getParam("/robot_name",robot_name_);
+	node_handle.getParam("/situation_assessment/locations",locations_);
 
 	ROS_INFO("ACTION_PRECONDITIONS_CHECKER human agents:");
 	for (int i=0;i<human_list_.size();i++) {
@@ -67,6 +68,8 @@ ActionPreconditionsChecker::ActionPreconditionsChecker(ros::NodeHandle node_hand
 	ROS_INFO("ACTION_PRECONDITIONS_CHECKER Advertising topics");
 
 	human_executable_actions_pub_=node_handle_.advertise<situation_assessment_actions_msgs::ExecutableActions>("/situation_assessment/human_executable_actions",1000);
+
+	ros::Duration(5).sleep();
 }
 
 void ActionPreconditionsChecker::agentFactCallback(const situation_assessment_msgs::FactList::ConstPtr& msg) {
@@ -164,6 +167,42 @@ void ActionPreconditionsChecker::monitorLoop() {
 		}
 
 		std::map<std::string,std::vector<action_management_msgs::Action> > agent_actions;
+
+		for (std::string h:human_list_) {
+			situation_assessment_msgs::Fact f;
+			f.model=robot_name_;
+			f.subject=h;
+			f.predicate={"isAt"};
+
+			situation_assessment_msgs::QueryDatabase srv;
+			srv.request.query=f;
+
+			if (database_client_.call(srv)) {
+				if (srv.response.result.size()>0 && srv.response.result[0].value.size()>0) {
+					std::string agent_location=srv.response.result[0].value[0];
+					for (std::string l:locations_) {
+						if (l!=agent_location && l!="this") {
+							action_management_msgs::Action a;
+							a.name="move";
+							std::vector<common_msgs::Parameter> parameter_list;
+							common_msgs::Parameter target_parameter;
+							target_parameter.name="target";
+							target_parameter.value=l;
+							common_msgs::Parameter agent_parameter;
+							agent_parameter.name="main_agent";
+							agent_parameter.value=h;
+							parameter_list={agent_parameter,target_parameter};
+							a.parameters=parameter_list;
+							agent_actions[h].push_back(a);
+						}
+					}
+				}
+			}
+			else {
+				ROS_ERROR("ACTION_PRECONDITIONS_CHECKER failed to call database");
+			}
+		}
+
 
 		for (int i=0; i<object_list_.size();i++) {
 			//For each object

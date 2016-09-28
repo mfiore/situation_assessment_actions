@@ -8,16 +8,16 @@ ObservationsCollector::ObservationsCollector(ros::NodeHandle node_handle):node_h
 
 	node_handle.getParam("/robot_name",robot_name_);
 
-	std::vector<std::string> locations;
-	node_handle.getParam("/situation_assessment/locations",locations);
-	ROS_INFO("INTENTION_RECOGNITION - Location list");
-	for (std::string l:locations){
-		int depth;
-		node_handle.getParam("/situation_assessment/locations_depth/"+l,depth);
-		depth_areas_[l]=depth;
-		ROS_INFO("INTENTION_RECOGNITION - location %s depth %d",l.c_str(),depth);
-	}
+	std::vector<double> distance_threshold;
+	node_handle.getParam("/situation_assessment/intention_recognition/distance_threshold",distance_threshold);
 
+	reach_=distance_threshold[0];
+	close_=distance_threshold[1];
+	medium_=distance_threshold[2];
+	far_=distance_threshold[3];
+
+	ROS_INFO("INTENTION_RECOGNITION the thresholds are %f %f %f %f",reach_,close_,medium_,far_);
+	std::string reach_,close_,medium_,far_,out_of_range_;
 
 
 }
@@ -27,15 +27,16 @@ std::map<std::string,std::string> ObservationsCollector::getEvidence(std::string
 	std::vector<std::string> observation_nodes=ig->getObservationNodes();
 	std::map<std::string,std::string> evidence;
 
-		for (std::string node : observation_nodes) {
+	for (std::string node : observation_nodes) {
 		std::vector<std::string> node_parts=StringOperations::stringSplit(node,'_');
 		//two possibilities:
 		//- subject action target 
 		//- subject action object target
 		//our fact will have: 
 		//-subject as the agent
-		//predicate[0] as node_parts[0] (distance or toward)
-		//predicate[1] as node_parts[size-1]					
+		//predicate[0] as node_parts[0] (distance or deltaDistance)
+		//predicate[1] as node_parts[size-1]		
+
 		
 		situation_assessment_msgs::Fact f;
 		f.subject=agent;
@@ -43,7 +44,34 @@ std::map<std::string,std::string> ObservationsCollector::getEvidence(std::string
 		f.predicate.push_back(node_parts[0]);
 		f.predicate.push_back(node_parts[node_parts.size()-1]);
 
-		evidence[node]=queryDatabase(f);
+		std::string actual_value=queryDatabase(f);
+		if (node_parts[0]=="distance") {
+			double d=stod(actual_value);
+			if (d<reach_) {
+				actual_value="reach";
+			}
+			else if (d<close_) {
+				actual_value="close";
+			}
+			else if (d<medium_) {
+				actual_value="medium";
+			}
+			else if (d<far_) {
+				actual_value="far";
+			}
+		}
+		else if (node_parts[0]=="deltaDistance") {
+			double d=stod(actual_value);
+			if (d>0) {
+				actual_value="t";
+			}
+			else {
+				actual_value="f";
+			}
+		}
+
+
+		evidence[node]=actual_value;
 	}
 	std::vector<std::string> context_nodes=ig->getContextNodes();
 	for (std::string node: context_nodes) {
@@ -77,30 +105,10 @@ std::map<std::string,std::string> ObservationsCollector::getInitialState(std::st
 				situation_assessment_msgs::Fact f;
 				f.model=robot_name_;
 				f.subject=v_parts[0];
-				if (v_parts[1]=="isAt") {
-					if (v_parts[0]==human_object) {
+				if (v_parts[1]=="isAt" && v_parts[0]==human_object) {
 						//if the human has an object its location is "human" in our formalism
 						initial_state[v]=agent;
-					}
-					else {
-						//at is isInArea in the system at the moment. Since an agent can be in more than one area
-						//at the same time (as areas can be nested) we will take just the maximum depth area
-						//(e.g. the table is in the living room. Both are areas. Living room has depth 1 and table
-						//has depth 2 so we take the table as value for the variable)
-						f.predicate.push_back("isInArea");
-						std::vector<string> areas=queryDatabaseVector(f);
-						int max_depth=0;
-						string max_depth_area;
-
-						for (string a:areas) {
-							int depth=depth_areas_.at(a);
-							if (depth>max_depth) {
-								max_depth=depth;
-								max_depth_area=a;
-							}
-	 					}
-	 					initial_state[v]=max_depth_area;
-				  	}
+					
 				}
 				else {
 					for (int i=1; i<v_parts.size();i++){
@@ -169,4 +177,14 @@ std::vector<std::string> ObservationsCollector::queryDatabaseVector(situation_as
 		ROS_WARN("INTENTION_RECOGNITION - failed to contact database");
 	}
 	return std::vector<std::string>();
+}
+
+
+std::string ObservationsCollector::getAt(std::string agent) {
+	situation_assessment_msgs::Fact f;
+	f.model=robot_name_;
+	f.subject=agent;
+	f.predicate={"isAt"};
+
+	return queryDatabase(f);
 }

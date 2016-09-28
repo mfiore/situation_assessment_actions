@@ -55,6 +55,7 @@ private:
 	std::vector<std::string> actions_to_monitor_;  
 	std::vector<std::string> object_list_;
 	std::map<std::string,std::vector<std::string> > object_affordances_; //links an object to possible actions
+	std::vector<std::string> locations_;
 
 	boost::mutex mutex_human_objects_;
 	std::map<std::string,std::string> human_objects_;  //std::maps each human to an object that he holds

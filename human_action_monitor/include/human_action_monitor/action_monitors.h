@@ -68,7 +68,7 @@ private:
 	vector<string> object_list_;
 	map<string,vector<string> > object_affordances_; //links an object to possible actions
 	vector<string> human_list_;
-	map<string,vector<string> > human_locations_;
+	map<string,string> human_locations_;
 
 
 	double trigger_distance_;  //trigger for deciding that an action is done
@@ -88,6 +88,7 @@ private:
 	std::map<std::string,boost::thread*> timers_threads_; 
 
 	ros::Subscriber inference_sub_;
+
 };
 
 
