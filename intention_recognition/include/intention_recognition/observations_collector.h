@@ -4,7 +4,9 @@
 #include <ros/ros.h>
 #include <IntentionGraph.h>
 #include <Mdp.h>
+#include <VariableSet.h>
 #include <situation_assessment_msgs/Fact.h>
+#include <situation_assessment_msgs/QueryDatabase.h>
 #include <situation_assessment_msgs/QueryDatabase.h>
 #include <intention_recognition/string_operations.h>
 
@@ -13,9 +15,9 @@ public:
 	ObservationsCollector(ros::NodeHandle node_handle);
 
 	//gets the initial state of an MDP
-	std::map<std::string,std::string> getInitialState(std::string agent, std::vector<Mdp*> mdps);
+	VariableSet getInitialState(std::string agent, std::vector<Mdp*> mdps);
 	//gets the current evidence for an IG
-	std::map<std::string,std::string> getEvidence(std::string agent, IntentionGraph* ig);
+	VariableSet getEvidence(std::string agent, IntentionGraph* ig);
 	
 	std::string getAt(std::string agent);
 

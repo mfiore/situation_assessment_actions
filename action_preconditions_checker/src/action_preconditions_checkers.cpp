@@ -158,7 +158,7 @@ std::string ActionPreconditionsChecker::getHumanObject(std::string human) {
 
 
 void ActionPreconditionsChecker::monitorLoop() {
-	ros::Rate r(3);
+	ros::Rate r(1);
 
 
 	while (ros::ok()) {

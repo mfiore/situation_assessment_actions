@@ -7,6 +7,7 @@
 #include "situation_assessment_actions_msgs/ExecutableActions.h"
 #include "situation_assessment_actions_msgs/ExecutableAgentActions.h"
 #include  "situation_assessment_actions_msgs/IntentionGraphResult.h"
+#include  "situation_assessment_actions_msgs/IntentionProb.h"
 #include "IntentionGraph.h"
 #include "Mdp.h"
 #include <boost/thread/mutex.hpp>
@@ -16,6 +17,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <std_msgs/Float32.h>
 
 
 typedef std::vector<std::string> StringVector;
@@ -59,6 +61,8 @@ private:
 	ros::Subscriber action_sub_;
 
 	ros::Publisher pub_intentions_;
+	std::map<std::string, ros::Publisher*> pub_intentions_plot_;
+	ros::Publisher tea_pub_;
 
 
 	boost::mutex mutex_igs_;

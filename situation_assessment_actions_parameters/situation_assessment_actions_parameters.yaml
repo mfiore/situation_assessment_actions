@@ -26,6 +26,16 @@ situation_assessment:
       mug:
         - pick
         - fill
+      keys:
+        - pick
+      remote:
+        - pick
+      book1:
+        - pick
+      book2:
+        - pick
+      book3:
+        - pick
       table:
         - place
       shelf1:
@@ -39,9 +49,17 @@ situation_assessment:
   intention_recognition:
     intention_list:
       - drink_water
-    # - drink_tea
+      - drink_tea
+      - go_out
+      - read_book
+      - watch_tv
+      - clean_books
     contexts:
       - hot_day
+      - cold_day
+      - time_to_leave
+      - evening
+      - sunday
     intention_details:
       drink_water:
         mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_water
@@ -49,12 +67,36 @@ situation_assessment:
           - hot_day
         context_probabilities:
           hot_day: 0.7
-          # drink_tea:
-          #     mdp_path: home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_tea
-          #     linked_contexts:
-          #         - cold_day
-          #     context_probabilities:
-          #         cold_day: 0.7
+      drink_tea:
+        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_tea
+        linked_contexts:
+          - cold_day
+        context_probabilities:
+          - cold_day: 0.7
+      go_out:
+        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/go_out
+        linked_contexts:
+          - time_to_leave
+        context_probabilities:
+          - time_to_leave: 0.7
+      read_book:
+        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/read_book
+        linked_contexts:
+          - evening
+        context_probabilities:
+          - evening: 0.7
+      watch_tv:
+        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/watch_tv
+        linked_contexts:
+          - sunday
+        context_probabilities:
+          - sunday: 0.7  
+      clean_books:
+        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/clean_books
+        linked_contexts:
+          - sunday
+        context_probabilities:
+          - sunday: 0.7
     distance_threshold:
       - 0.8
       - 1.5

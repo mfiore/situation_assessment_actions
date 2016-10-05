@@ -18,7 +18,7 @@ project(intention_recognition)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED roscpp rospy message_runtime situation_assessment_actions_msgs
-situation_assessment_msgs )
+situation_assessment_msgs std_msgs )
 
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system thread)
@@ -155,8 +155,8 @@ situation_assessment_msgs_generate_messages_cpp situation_assessment_actions_msg
 ## Specify libraries to link a library or executable target against
  target_link_libraries(intention_recognition
    ${catkin_LIBRARIES}
-    $ENV{MDP_DIR}/dist/Debug/GNU-Linux/libpomdp.so
-    $ENV{IG_DIR}/dist/Debug/GNU-Linux/libIntentionGraph.so
+    $ENV{MDP_DIR}/dist/Release/GNU-Linux/libpomdp.a
+    $ENV{IG_DIR}/dist/Release/GNU-Linux/libIntentionGraph.so
  )
 
 #############

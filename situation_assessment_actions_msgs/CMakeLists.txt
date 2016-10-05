@@ -53,6 +53,7 @@ find_package(catkin REQUIRED COMPONENTS
    IntentionGraphResult.msg
    ExecutableAgentActions.msg
    ExecutableActions.msg
+   IntentionProb.msg
  )
 
 ## Generate services in the 'srv' folder

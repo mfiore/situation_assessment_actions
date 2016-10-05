@@ -23,10 +23,17 @@ ObservationsCollector::ObservationsCollector(ros::NodeHandle node_handle):node_h
 }
 
 //gets the current evidence for an IG
-std::map<std::string,std::string> ObservationsCollector::getEvidence(std::string agent, IntentionGraph* ig) {
+VariableSet ObservationsCollector::getEvidence(std::string agent, IntentionGraph* ig) {
 	std::vector<std::string> observation_nodes=ig->getObservationNodes();
 	std::map<std::string,std::string> evidence;
 
+
+	situation_assessment_msgs::Fact is_facing_f;
+	is_facing_f.subject=agent;
+	is_facing_f.model=robot_name_;
+	is_facing_f.predicate.push_back("isFacing");
+
+	std::vector<string> agent_facing=queryDatabaseVector(is_facing_f);
 	for (std::string node : observation_nodes) {
 		std::vector<std::string> node_parts=StringOperations::stringSplit(node,'_');
 		//two possibilities:
@@ -44,7 +51,10 @@ std::map<std::string,std::string> ObservationsCollector::getEvidence(std::string
 		f.predicate.push_back(node_parts[0]);
 		f.predicate.push_back(node_parts[node_parts.size()-1]);
 
-		std::string actual_value=queryDatabase(f);
+		std::string actual_value;
+		if (node_parts[0]!="isFacing") {
+			actual_value=queryDatabase(f);
+		}
 		if (node_parts[0]=="distance") {
 			double d=stod(actual_value);
 			if (d<reach_) {
@@ -59,15 +69,28 @@ std::map<std::string,std::string> ObservationsCollector::getEvidence(std::string
 			else if (d<far_) {
 				actual_value="far";
 			}
+			// if (d<close_) {
+			// 	actual_value="close";
+			// }
+			// else {
+			// 	actual_value="far";
+			// }
 		}
-		else if (node_parts[0]=="deltaDistance") {
-			double d=stod(actual_value);
-			if (d>0) {
+		else if (node_parts[0]=="isFacing") {
+			if (std::find(agent_facing.begin(),agent_facing.end(),
+				node_parts[node_parts.size()-1])!=agent_facing.end()) {
 				actual_value="t";
 			}
 			else {
 				actual_value="f";
 			}
+			// double d=stod(actual_value);
+			// if (d>0) {
+			// 	actual_value="t";
+			// }
+			// else {
+			// 	actual_value="f";
+			// }
 		}
 
 
@@ -82,11 +105,14 @@ std::map<std::string,std::string> ObservationsCollector::getEvidence(std::string
 
 		evidence[node]=queryDatabase(f);
 	}
-	return evidence;
+
+	VariableSet v;
+	v.set=evidence;
+	return v;;
 }
 
 //gets the initial state of an MDP
-std::map<std::string,std::string> ObservationsCollector::getInitialState(std::string agent, std::vector<Mdp*> mdps) {
+VariableSet ObservationsCollector::getInitialState(std::string agent, std::vector<Mdp*> mdps) {
 	std::map<std::string,std::string> initial_state;
 
 	situation_assessment_msgs::Fact has_fact;
@@ -128,7 +154,9 @@ std::map<std::string,std::string> ObservationsCollector::getInitialState(std::st
 			}
 		}
 	}
-	return initial_state;
+	VariableSet v;
+	v.set=initial_state;
+	return v;
 }
 
 
