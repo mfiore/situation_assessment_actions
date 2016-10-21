@@ -64,6 +64,7 @@ private:
 
 	bool use_database_; //parameter that decides if we use the db or a topic to get observations
 	std::map<std::string,std::string> action_targets_;
+	std::map<std::string,std::string> action_monitor_part_;
 
 };
 

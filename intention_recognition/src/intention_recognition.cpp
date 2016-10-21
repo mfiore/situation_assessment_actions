@@ -143,6 +143,9 @@ void IntentionRecognition::createIntentionGraph(std::string agent, std::vector<s
 	    // 	ROS_INFO("%s",a.c_str());
 	    // }
 	    // ROS_INFO("%ld",intention_nodes.size());
+	    // 
+	    cout<<"ig size\n";
+	    cout<<contexts_.size()<<" "<<intention_nodes.size()<<" "<<actions.size()<<" "<<mdps.size()<<"\n"; 
 
 	    ig->setGraph(contexts_,intention_nodes,actions,mdps,initial_state);
 	    ROS_INFO("INTENTION_RECOGNITION set graph");
@@ -310,6 +313,7 @@ void IntentionRecognition::actionCallback(const situation_assessment_actions_msg
  		ROS_INFO("INTENTION_RECOGNITION done");
 
  	}
+ 	// ROS_INFO("INTENTION_RECOGNITION out of callback action");
 }
 
 
@@ -330,9 +334,9 @@ void IntentionRecognition::intentionLoop(){
 			// ROS_INFO("Before computing probabilities");
 			std::map<std::string,double> agent_probability=ig.second->computeProbability(evidence);
 			// ROS_INFO("After computing probabilities");
-			// for (auto p:agent_probability) {
-			// 	ROS_INFO("%s %f",p.first.c_str(),p.second);
-			// }
+			for (auto p:agent_probability) {
+				ROS_INFO("%s %f",p.first.c_str(),p.second);
+			}
 			
 			std::vector<string> agent_actions=ig.second->getActionNodes();
 			agent_inference_msg.actions=agent_actions;
@@ -357,9 +361,15 @@ void IntentionRecognition::intentionLoop(){
 		// plot_msg.at("drink_tea").data=1.0;
 		// tea_pub_.publish(plot_msg.at("drink_tea"));
 		for (string i:intention_list_) {
-			pub_intentions_plot_.at(i)->publish(plot_msg.at(i));
+			// ROS_INFO("crash here?");
+			if (plot_msg.find(i)!=plot_msg.end()) {
+				pub_intentions_plot_.at(i)->publish(plot_msg.at(i));
+			}
+			// ROS_INFO("Crash here?");
 		}
-		// r.sleep();
+		if (plot_msg.size()==0) {
+			r.sleep();
+		}
 	}
 	// ROS_INFO("INTENTION_RECOGNITION - killing node");
 	for (auto m:mdp_map_) {

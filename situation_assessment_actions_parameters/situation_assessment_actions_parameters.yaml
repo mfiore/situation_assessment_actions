@@ -3,7 +3,7 @@ situation_assessment:
   action_monitoring:
     temporal_threshold: 3
     use_database: true
-    trigger_distance: 0.2
+    trigger_distance: 0.5
     actions_to_monitor:
       - pick    
       - place
@@ -12,12 +12,15 @@ situation_assessment:
       pick:
         target: main_object
         monitor_part: hand
+        orientation_part: torso
       place:
         target: target
         monitor_part: hand
+        orientation_part: torso
       fill:
         target: target
         monitor_part: hand
+        orientation_part: torso
     affordances:
       waterbottle:
         - pick
@@ -62,37 +65,37 @@ situation_assessment:
       - sunday
     intention_details:
       drink_water:
-        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_water
+        mdp_path: /home/theworld/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_water
         linked_contexts:
           - hot_day
         context_probabilities:
           hot_day: 0.7
       drink_tea:
-        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_tea
+        mdp_path: /home/theworld/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_tea
         linked_contexts:
           - cold_day
         context_probabilities:
           - cold_day: 0.7
       go_out:
-        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/go_out
+        mdp_path: /home/theworld/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/go_out
         linked_contexts:
           - time_to_leave
         context_probabilities:
           - time_to_leave: 0.7
       read_book:
-        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/read_book
+        mdp_path: /home/theworld/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/read_book
         linked_contexts:
           - evening
         context_probabilities:
           - evening: 0.7
       watch_tv:
-        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/watch_tv
+        mdp_path: /home/theworld/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/watch_tv
         linked_contexts:
           - sunday
         context_probabilities:
           - sunday: 0.7  
       clean_books:
-        mdp_path: /home/mfiore/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/clean_books
+        mdp_path: /home/theworld/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/clean_books
         linked_contexts:
           - sunday
         context_probabilities:

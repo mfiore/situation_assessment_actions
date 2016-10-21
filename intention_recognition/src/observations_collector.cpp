@@ -29,7 +29,7 @@ VariableSet ObservationsCollector::getEvidence(std::string agent, IntentionGraph
 
 
 	situation_assessment_msgs::Fact is_facing_f;
-	is_facing_f.subject=agent;
+	is_facing_f.subject=agent+"_head";
 	is_facing_f.model=robot_name_;
 	is_facing_f.predicate.push_back("isFacing");
 
@@ -44,12 +44,31 @@ VariableSet ObservationsCollector::getEvidence(std::string agent, IntentionGraph
 		//predicate[0] as node_parts[0] (distance or deltaDistance)
 		//predicate[1] as node_parts[size-1]		
 
-		
+		string action_name=node_parts[2];
+		string fact_subject=action_name;
+		string observation_type=node_parts[0];
+		string target=node_parts[node_parts.size()-1];
+
+
+		string body_part;
+
+		if (action_name=="move") {
+			body_part="torso";
+		}
+		else {
+			if (observation_type=="isFacing") {
+				body_part="head";
+			}
+			else {
+				body_part="hand";
+			}
+		}
 		situation_assessment_msgs::Fact f;
-		f.subject=agent;
+		
+		f.subject=agent+"_"+body_part;
 		f.model=robot_name_;
-		f.predicate.push_back(node_parts[0]);
-		f.predicate.push_back(node_parts[node_parts.size()-1]);
+		f.predicate.push_back(observation_type);
+		f.predicate.push_back(target);
 
 		std::string actual_value;
 		if (node_parts[0]!="isFacing") {
@@ -130,7 +149,15 @@ VariableSet ObservationsCollector::getInitialState(std::string agent, std::vecto
 				std::vector<std::string> v_parts=StringOperations::stringSplit(v,'_');
 				situation_assessment_msgs::Fact f;
 				f.model=robot_name_;
-				f.subject=v_parts[0];
+
+				if (v_parts[0]==agent && v_parts[1]=="isAt") {
+					cout<<"hereeee\n";
+					f.model=robot_name_;
+					f.subject=agent+"_torso";
+				}
+				else {
+					f.subject=v_parts[0];
+				}
 				if (v_parts[1]=="isAt" && v_parts[0]==human_object) {
 						//if the human has an object its location is "human" in our formalism
 						initial_state[v]=agent;

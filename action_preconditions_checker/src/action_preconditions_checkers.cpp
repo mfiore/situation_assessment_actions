@@ -20,6 +20,9 @@ ActionPreconditionsChecker::ActionPreconditionsChecker(ros::NodeHandle node_hand
 		node_handle_.getParam("/situation_assessment/action_monitoring/actions_details/"
 			+actions_to_monitor_[i]+"/target",target);
 
+
+
+
 		ROS_INFO("HUMAN_ACTION_MONITOR target is %s",target.c_str());
 		action_targets_[actions_to_monitor_[i]]=target;
 
@@ -171,7 +174,7 @@ void ActionPreconditionsChecker::monitorLoop() {
 		for (std::string h:human_list_) {
 			situation_assessment_msgs::Fact f;
 			f.model=robot_name_;
-			f.subject=h;
+			f.subject=h+"_torso";
 			f.predicate={"isAt"};
 
 			situation_assessment_msgs::QueryDatabase srv;
