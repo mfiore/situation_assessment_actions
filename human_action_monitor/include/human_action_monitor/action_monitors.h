@@ -1,5 +1,7 @@
 /*
-This class is used to monitor human actions.
+This class is used to monitor human actions. It reads from the human_executable_actions topic to understand
+which actions can be executed at the moment and then through geometrical reasoning computes which actions
+are executed. 
 */
 
 #ifndef ACTION_MONITORS_H
@@ -39,55 +41,67 @@ public:
 private:
 
 	void executableActionsCallback(
-	 	const situation_assessment_actions_msgs::ExecutableActions::ConstPtr& msg);
-	// void ActionMonitors::inferenceCallback(
-		// const situation_assessment_actions_msgs::IntentionGraphResult::ConstPtr& msg);
+	 	const situation_assessment_actions_msgs::ExecutableActions::ConstPtr& msg); //call back for actions whose preconditions are true
+
+
+	//utility functions that turn the action parameters in a std::map
 	std::map<std::string,std::string> getParameterMap(
-		std::vector<common_msgs::Parameter> parameter_message);
-	double getDistance(string agent, string target, string monitor_part);
+		std::vector<common_msgs::Parameter> parameter_message); 
 
+	/* 
+	//computes the distance between the target of an action and the monitor part of 
+	an agent for that action (e.g hand) */
+	double getDistance(string agent, string target, string monitor_part); 
 
-	std::vector<action_management_msgs::Action> getMoveActions();
+	/*movement actions are computed directly from a database, by measuring if the location of an  agent
+	has changed. This is done in this function */
+	std::vector<action_management_msgs::Action> getMoveActions(); 
 
 
 	ros::NodeHandle node_handle_; 
-	ros::ServiceClient database_query_client_; //used only if we are using the database to get human observation
-	ros::Subscriber fact_subscriber_; //used if we are looping on a topic to get observations
+	
+	//used to get human observations	
+	ros::ServiceClient database_query_client_;
 
-	ros::Subscriber executable_actions_subscriber_;
+
+	ros::Subscriber executable_actions_subscriber_; //subscriber to actions that can be executed
+
+	// contains the list of executable actions
 	vector<situation_assessment_actions_msgs::ExecutableAgentActions> executable_actions_;  
-	vector<std::string> actions_to_monitor_;
+	
 
+
+	//publisher of executed actions
 	ros::Publisher executed_actions_pub_;
 
 
 	//a map that links an action name with a service to get its postconditions
 	map<string,ros::ServiceClient> action_postconditions_services_;
 
-	//values read from parameters
-	vector<string> object_list_;
+	vector<string> object_list_; //list of objects
 	map<string,vector<string> > object_affordances_; //links an object to possible actions
-	vector<string> human_list_;
-	map<string,string> human_locations_;
-
-
+	vector<string> human_list_; //list of humans
+	map<string,string> human_locations_; //list of locations
+	vector<std::string> actions_to_monitor_; //actions to be monitored
 	double trigger_distance_;  //trigger for deciding that an action is done
+	string robot_name_;  //name of the robot
 
-	string robot_name_; 
+	ros::ServiceClient database_client_;  //used to add the action's postconditions to the database
 
-	bool use_database_; //parameter that decides if we use the db or a topic to get observations
+	/*links an action to a joint of a human. Ex. pick is linked to the human's hand, which will 
+	be used to compute the distance and infer when the action has been done*/	
+	std::map<std::string,std::string> action_monitor_parts_; 
+	/*information about the action's target. Ex. the target of the action (mug) is the main_object of
+	the pick action*/
+	std::map<std::string,std::string> action_targets_info_;
 
-	ros::ServiceClient database_client_;  //puts facts in the db
-
-	std::map<std::string,std::string> action_monitor_parts_;
-	std::map<std::string,std::string> action_targets_;
-
+	//threshold during which the human can't execute a second action. Useful to avoid situation where
+	//the human is picking/placing objects in a loop
 	double time_threshold_;
 
+	//two variables used to keep a timer for each agent after they execute an action
 	std::map<std::string,SupervisionTimer*> agent_timers_;
 	std::map<std::string,boost::thread*> timers_threads_; 
-
-	ros::Subscriber inference_sub_;
 
 };
 

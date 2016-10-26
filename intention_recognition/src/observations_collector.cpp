@@ -27,14 +27,17 @@ VariableSet ObservationsCollector::getEvidence(std::string agent, IntentionGraph
 	std::vector<std::string> observation_nodes=ig->getObservationNodes();
 	std::map<std::string,std::string> evidence;
 
-
 	situation_assessment_msgs::Fact is_facing_f;
 	is_facing_f.subject=agent+"_head";
 	is_facing_f.model=robot_name_;
 	is_facing_f.predicate.push_back("isFacing");
 
+	//get the orientation of the agent
 	std::vector<string> agent_facing=queryDatabaseVector(is_facing_f);
+
 	for (std::string node : observation_nodes) {
+		//observations are in the form observationname_action
+		//create a vector from a string by splitting on "_" (e.g. distance_agent_take_mug => [distance,agent,take,mug])
 		std::vector<std::string> node_parts=StringOperations::stringSplit(node,'_');
 		//two possibilities:
 		//- subject action target 
@@ -42,16 +45,20 @@ VariableSet ObservationsCollector::getEvidence(std::string agent, IntentionGraph
 		//our fact will have: 
 		//-subject as the agent
 		//predicate[0] as node_parts[0] (distance or deltaDistance)
-		//predicate[1] as node_parts[size-1]		
+		//predicate[1] as node_parts[size-1] (mug in the ex. above)		
 
 		string action_name=node_parts[2];
 		string fact_subject=action_name;
 		string observation_type=node_parts[0];
 		string target=node_parts[node_parts.size()-1];
 
-
 		string body_part;
 
+		/*the body part for the query are precomputed. Should be parametrized
+		move actions are computed from the torso 
+		isFacing from the head
+		others from the hand
+		*/
 		if (action_name=="move") {
 			body_part="torso";
 		}
@@ -75,6 +82,7 @@ VariableSet ObservationsCollector::getEvidence(std::string agent, IntentionGraph
 			actual_value=queryDatabase(f);
 		}
 		if (node_parts[0]=="distance") {
+			//distance observations are transformed in reach\close\medium\far from thresholds
 			double d=stod(actual_value);
 			if (d<reach_) {
 				actual_value="reach";
@@ -88,12 +96,6 @@ VariableSet ObservationsCollector::getEvidence(std::string agent, IntentionGraph
 			else if (d<far_) {
 				actual_value="far";
 			}
-			// if (d<close_) {
-			// 	actual_value="close";
-			// }
-			// else {
-			// 	actual_value="far";
-			// }
 		}
 		else if (node_parts[0]=="isFacing") {
 			if (std::find(agent_facing.begin(),agent_facing.end(),
@@ -103,23 +105,17 @@ VariableSet ObservationsCollector::getEvidence(std::string agent, IntentionGraph
 			else {
 				actual_value="f";
 			}
-			// double d=stod(actual_value);
-			// if (d>0) {
-			// 	actual_value="t";
-			// }
-			// else {
-			// 	actual_value="f";
-			// }
 		}
 
 
 		evidence[node]=actual_value;
 	}
+	//now compute the contexts. In the DB contexts are represented as (MODEL AGENT CONTEXT VALUE)
 	std::vector<std::string> context_nodes=ig->getContextNodes();
 	for (std::string node: context_nodes) {
 		situation_assessment_msgs::Fact f;
-		f.subject=agent;
 		f.model=robot_name_;
+		f.subject=agent;
 		f.predicate.push_back(node);
 
 		evidence[node]=queryDatabase(f);
@@ -132,7 +128,7 @@ VariableSet ObservationsCollector::getEvidence(std::string agent, IntentionGraph
 
 //gets the initial state of an MDP
 VariableSet ObservationsCollector::getInitialState(std::string agent, std::vector<Mdp*> mdps) {
-	std::map<std::string,std::string> initial_state;
+	std::map<std::string,std::string> initial_state; //will contain the state of the system
 
 	situation_assessment_msgs::Fact has_fact;
 	has_fact.model=robot_name_;
@@ -145,18 +141,21 @@ VariableSet ObservationsCollector::getInitialState(std::string agent, std::vecto
 		std::vector<std::string> original_vars=m->getOriginalVars();
 		for (std::string v : original_vars) {
 			if (initial_state.find(v)==initial_state.end()) {
+				//different mdps can share variables, so we check if this is a new variable
 
+				//split the variable on _
 				std::vector<std::string> v_parts=StringOperations::stringSplit(v,'_');
 				situation_assessment_msgs::Fact f;
 				f.model=robot_name_;
 
+				//for "isAt" we will do a query based on the torso location
 				if (v_parts[0]==agent && v_parts[1]=="isAt") {
-					cout<<"hereeee\n";
 					f.model=robot_name_;
 					f.subject=agent+"_torso";
 				}
 				else {
-					f.subject=v_parts[0];
+					//else subject is the first part of the string (e.g. mug_isAt => subject is mug)
+					f.subject=v_parts[0]; 
 				}
 				if (v_parts[1]=="isAt" && v_parts[0]==human_object) {
 						//if the human has an object its location is "human" in our formalism
@@ -168,15 +167,6 @@ VariableSet ObservationsCollector::getInitialState(std::string agent, std::vecto
 						f.predicate.push_back(v_parts[i]);
 					}
 					initial_state[v]=queryDatabase(f);
-				}
-				// ROS_INFO("INTENTION_RECOGNITION subject %s",f.subject.c_str());
-				// ROS_INFO("INTENTION_RECOGNITION predicate:");
-				for (string p:f.predicate) {
-					// ROS_INFO("INTENTION_RECOGNITION %s",p.c_str());					
-				}
-				// ROS_INFO("INTENTION_RECOGNITION value:");
-				for (string p:f.value) {
-					// ROS_INFO("INTENTION_RECOGNITION %s",p.c_str());					
 				}
 			}
 		}

@@ -5,21 +5,18 @@ ActionMonitors::ActionMonitors(ros::NodeHandle node_handle):node_handle_(node_ha
 
 	node_handle_.getParam("/situation_assessment/action_monitoring/actions_to_monitor",actions_to_monitor_);
 	node_handle_.getParam("/situation_assessment/action_monitoring/trigger_distance",trigger_distance_);
-	node_handle_.getParam("/situation_assessment/action_monitoring/use_database",use_database_);
 	node_handle_.getParam("/situation_assessment/action_monitoring/temporal_threshold",time_threshold_);
 	node_handle_.getParam("/situation_assessment/human_names",human_list_);
 
 	ROS_INFO("HUMAN_ACTION_MONITOR robot %s",robot_name_.c_str());
 	ROS_INFO("HUMAN_ACTION_MONITOR temporal temporal_threshold is %f",time_threshold_);
 	
-
 	ROS_INFO("HUMAN_ACTION_MONITOR human list:");
 	for (string a:human_list_) {
 		ROS_INFO("HUMAN_ACTION_MONITOR - %s",a.c_str());
 			human_locations_[a+"_torso"]={"this"};
 	}
 	
-
 	ROS_INFO("HUMAN_ACTION_MONITOR actions to monitor:");
 
 	for (int i=0;i<actions_to_monitor_.size();i++) {
@@ -35,7 +32,7 @@ ActionMonitors::ActionMonitors(ros::NodeHandle node_handle):node_handle_(node_ha
 
 		ROS_INFO("HUMAN_ACTION_MONITOR target is %s",target.c_str());
 		ROS_INFO("HUMAN_ACTION_MONITOR monitor part is %s",monitor_part.c_str());
-		action_targets_[actions_to_monitor_[i]]=target;
+		action_targets_info_[actions_to_monitor_[i]]=target;
 		action_monitor_parts_[actions_to_monitor_[i]]=monitor_part;
 
 	}
@@ -58,14 +55,8 @@ ActionMonitors::ActionMonitors(ros::NodeHandle node_handle):node_handle_(node_ha
 
 	executed_actions_pub_=node_handle_.advertise<action_management_msgs::ActionList>("/situation_assessment/humans_executed_actions",1000);
 
-	// inference_sub_=node_handle_.subscribe("situation_assessment/agents_inference",1000,&ActionMonitors::inferenceCallback,
-		// this);
 
  }
-// void ActionMonitors::inferenceCallback(
-	// const situation_assessment_actions_msgs::IntentionGraphResult::ConstPtr& msg) {
-// 
-// }
 
 
 void ActionMonitors::executableActionsCallback(
@@ -131,6 +122,7 @@ std::vector<action_management_msgs::Action> ActionMonitors::getMoveActions() {
 				if (query_location.response.result[i].value.size()>0) {
 					string new_location=query_location.response.result[i].value[0];
 					if (new_location!=human_locations_.at(entity)) {
+						//human has changed location
 						human_locations_[entity]=new_location;
 						action_management_msgs::Action action;
 						action.name="move";
@@ -157,37 +149,42 @@ std::vector<action_management_msgs::Action> ActionMonitors::getMoveActions() {
 void ActionMonitors::actionLoop() {
 	ros::Rate r(3);
 	while (ros::ok()) {
-		ros::spinOnce();
+		ros::spinOnce(); //Since we use spin at the start of the loop there's no need to synchronize the callbacks with a mutex
 		action_management_msgs::ActionList actions_to_execute;
+	
 		std::vector<action_management_msgs::Action> move_actions=getMoveActions(); //we start considering move actions and then update it with other actions
 
 		std::map<std::string,action_management_msgs::Action> agent_actions;
 
-		// std::set<std::string>  already_acted; //includes agent that have moved (that's their action for this time instance)
 
 		for (int i=0; i<move_actions.size();i++) {
 			agent_actions[move_actions[i].parameters[0].value]=move_actions[i]; //the first parameter in move is main_agent
 		}
 
+		/*if there are different actions executable on targets we will take the shortest distance 
+		lower than trigger_distance_ (since we execute only one action at a time)
+		*/
 		std::map<std::string, double>  min_distance_targets;
 
 		for (int i=0;i<executable_actions_.size();i++) {
 			string agent=executable_actions_[i].agent;
 			if (agent_actions.find(agent)==agent_actions.end()) {
+				//if an agent has not already acted (ex. a move action)
 				std::vector<action_management_msgs::Action> agent_executable_actions=executable_actions_[i].actions;
 				for (int j=0;j<agent_executable_actions.size();j++) {
 					string action_name=agent_executable_actions[j].name;
-					if (action_name!="move") {
+					if (action_name!="move") { //move actions are handled separately and are ignored in this loop
 						std::map<std::string,std::string> parameters=getParameterMap(agent_executable_actions[j].parameters);
-						string t=action_targets_.at(action_name);
+						string t=action_targets_info_.at(action_name);
 						string action_target=parameters.at(t);
 
 						string monitor_part=action_monitor_parts_.at(action_name);
 						double distance=getDistance(agent,action_target,monitor_part);
 						if (distance<trigger_distance_) {
+							//distance<trigger, the action can be executed. We try to get the minimum distance
 							if (min_distance_targets.find(agent)!=min_distance_targets.end()) {
 								if (distance<min_distance_targets.at(agent)) {
-									min_distance_targets[agent]=distance;
+									min_distance_targets[agent]=distance; 
 									agent_actions[agent]=agent_executable_actions[j];
 								}
 							}
@@ -202,35 +199,30 @@ void ActionMonitors::actionLoop() {
 			}
 		}
 		for (auto aga: agent_actions) {
-			if (agent_timers_.find(aga.first)==agent_timers_.end()) {
+			if (agent_timers_.find(aga.first)==agent_timers_.end()) { //if there is no timer we create one
 				agent_timers_[aga.first]=new SupervisionTimer(time_threshold_);
 			}
-			if (!agent_timers_.at(aga.first)->isRunning()) {
+			if (!agent_timers_.at(aga.first)->isRunning()) { //if the timer is running the agent can't execute actions 
 				if (timers_threads_.find(aga.first)!=timers_threads_.end()) {
 					delete timers_threads_.at(aga.first);
 					timers_threads_[aga.first]=NULL;
 				}
+				//set postconditions
 				action_management_msgs::SetPostconditions srv;
 				common_msgs::ParameterList parameter_list;
 				parameter_list.parameter_list=aga.second.parameters;
 				srv.request.parameters=parameter_list;
 				string action_name=aga.second.name;
 				if (action_name=="move" || action_postconditions_services_.at(action_name).call(srv)) {
+					//move has no postconditions service
 					actions_to_execute.actions.push_back(aga.second);
 					timers_threads_[aga.first]=new boost::thread(boost::bind(&SupervisionTimer::start,
 					agent_timers_.at(aga.first)));
-							// agent_timers_[agent]->start();
-									// SupervisionTimer s(3);
-									// s.start();
 				}
 				else {
 							ROS_WARN("ACTION_MONITORS failed to set postconditions for action %s",action_name.c_str());
 				}
 			}
-			else {
-						// ROS_INFO("TIMER IS RUNNING");
-			}
-				
 		}
 		executed_actions_pub_.publish(actions_to_execute);
 		r.sleep();
@@ -244,106 +236,3 @@ void ActionMonitors::actionLoop() {
 		delete agent_timers_.at(tt.first);
 	}
 }
-// void ActionMonitors::actionLoop() {
-// 	ros::Rate r(3);
-// 	while (ros::ok()) {
-// 		ros::spinOnce();
-// 		action_management_msgs::ActionList actions_to_execute;
-// 		// std::vector<action_management_msgs::Action> eligible_actions=getMoveActions(); //we start considering move actions and then update it with other actions
-
-// 		std::map<std::string,action_management_msgs::Action> agent_actions;
-
-// 		std::map<std::string, double>  min_distance_targets;
-// 		// std::set<std::string>  already_acted; //includes agent that have moved (that's their action for this time instance)
-
-// 		for (int i=0; i<eligible_actions.size();i++) {
-// 			already_acted.insert(eligible_actions[i].parameters[0].value); //the first parameter in move is main_agent
-// 		}
-
-// 		for (int i=0;i<executable_actions_.size();i++) {
-// 			std::vector<action_management_msgs::Action> agent_actions=executable_actions_[i].actions;
-// 			for (int j=0; j<agent_actions.size();j++) {
-// 				string action_name=agent_actions[j].name;
-// 				if (action_name!="move") {
-// 					std::map<std::string,std::string> parameters=getParameterMap(agent_actions[j].parameters);
-// 					string t=action_targets_.at(action_name);
-// 					string action_target=parameters.at(t);
-// 					string agent=parameters.at("main_agent");
-
-// 					if (already_acted.find(agent)==already_acted.end()) {
-			
-// 						string monitor_part=action_monitor_parts_.at(action_name);
-// 						double distance=getDistance(agent,action_target,monitor_part);
-// 						if (distance<trigger_distance_) {
-// 							//prune action if there is a closer object
-// 							//the if contains in the first part a check to see if there are already objects found for
-// 							//the agent whose distance is < than trigger and, in that case, if the object of this
-// 							//action is closer
-// 							//the second part just checks if there is no object already found
-// 							if (
-// 								(min_distance_targets.find(agent)!=min_distance_targets.end()
-// 								&& distance<min_distance_targets.at(agent)) ||
-// 								min_distance_targets.find(agent)==min_distance_targets.end()
-// 								) {
-// 									min_distance_targets[agent]=distance;
-// 									ROS_INFO("Adding an action %s",agent_actions[j].name.c_str());
-// 									eligible_actions.push_back(agent_actions[j]);
-// 							} 
-// 						}		
-// 					}
-// 				}
-
-// 			}
-// 		}
-// 		// ROS_INFO("New action cycle");
-// 		for (int i=0; i<eligible_actions.size(); i++) {
-// 			string action_name=eligible_actions[i].name;
-// 			// ROS_INFO("action is %s",action_name.c_str());
-// 			std::map<std::string,std::string> parameters=getParameterMap(eligible_actions[i].parameters);
-// 			string agent=parameters.at("main_agent");
-
-// 			if (agent_timers_.find(agent)==agent_timers_.end()) {
-// 				agent_timers_[agent]=new SupervisionTimer(time_threshold_);
-// 			}
-
-// 			if (!agent_timers_.at(agent)->isRunning()) {
-// 				if (timers_threads_.find(agent)!=timers_threads_.end()) {
-// 					delete timers_threads_.at(agent);
-// 					timers_threads_[agent]=NULL;
-// 				}
-
-// 				action_management_msgs::SetPostconditions srv;
-// 				common_msgs::ParameterList parameter_list;
-// 				parameter_list.parameter_list=eligible_actions[i].parameters;
-// 				srv.request.parameters=parameter_list;
-
-// 				if (action_name=="move" || action_postconditions_services_.at(action_name).call(srv)) {
-// 					actions_to_execute.actions.push_back(eligible_actions[i]);
-// 					timers_threads_[agent]=new boost::thread(boost::bind(&SupervisionTimer::start,
-// 						agent_timers_.at(agent)));
-// 								// agent_timers_[agent]->start();
-// 							// SupervisionTimer s(3);
-// 							// s.start();
-// 				}
-// 				else {
-// 					ROS_WARN("ACTION_MONITORS failed to set postconditions for action %s",action_name.c_str());
-// 				}
-// 			}
-// 			else {
-// 				// ROS_INFO("TIMER IS RUNNING");
-// 			}
-		
-// 		}
-
-// 		executed_actions_pub_.publish(actions_to_execute);
-// 		r.sleep();
-// 	}
-// 	for (auto tt:timers_threads_) {
-// 		agent_timers_.at(tt.first)->stop();
-// 		tt.second->join();
-// 		if (tt.second!=NULL) {
-// 			delete tt.second;
-// 		}
-// 		delete agent_timers_.at(tt.first);
-// 	}
-// }

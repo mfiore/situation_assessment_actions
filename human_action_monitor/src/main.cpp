@@ -7,7 +7,5 @@ int main(int argc, char** argv) {
 	ros::NodeHandle node_handle_;
 	ActionMonitors action_monitors(node_handle_);
 	action_monitors.actionLoop();
-	// boost::thread t(boost::bind(&ActionMonitors::start,&action_monitors));
-	// ros::spin();
 	return 0;
 }

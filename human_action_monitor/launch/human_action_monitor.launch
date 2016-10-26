@@ -1,6 +1,6 @@
 <launch>
   <include file="$(find simple_agent_monitor)/launch/simple_agent_monitor.launch" />
-  <rosparam command="load" file="$(find situation_assessment_actions_parameters)/situation_assessment_actions_parameters.yaml" />
+<!--   <rosparam command="load" file="$(find situation_assessment_actions_parameters)/situation_assessment_actions_parameters.yaml" /> -->
 
    <node name="action_preconditions_checker" pkg="action_preconditions_checker" type="action_preconditions_checker" /> 
    <node name="basic_actions" pkg="action_nodes" type="basic_actions"  /> 

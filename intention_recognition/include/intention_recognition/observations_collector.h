@@ -1,3 +1,5 @@
+/* Collects observations needed by the mdps and the IG*/
+
 #ifndef OBSERVATIONS_COLLECTOR_H
 #define OBSERVATIONS_COLLECTOR_H
 
@@ -14,11 +16,12 @@ class ObservationsCollector {
 public:
 	ObservationsCollector(ros::NodeHandle node_handle);
 
-	//gets the initial state of an MDP
+	//gets the initial state of the MDPs
 	VariableSet getInitialState(std::string agent, std::vector<Mdp*> mdps);
 	//gets the current evidence for an IG
 	VariableSet getEvidence(std::string agent, IntentionGraph* ig);
 	
+	//get location of an agent	
 	std::string getAt(std::string agent);
 
 	//utility that queries the database and returns a value
@@ -29,7 +32,7 @@ private:
 	ros::NodeHandle node_handle_;
 	ros::ServiceClient database_service_;
 	std::string robot_name_;
-	double reach_,close_,medium_,far_;
+	double reach_,close_,medium_,far_; //distances for the observations
 
 };
 

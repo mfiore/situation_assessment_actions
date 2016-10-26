@@ -1,27 +1,28 @@
 ---
 situation_assessment:
   action_monitoring:
-    temporal_threshold: 3
-    use_database: true
-    trigger_distance: 0.5
-    actions_to_monitor:
+    temporal_threshold: 3  #the human can do one action every temporal_threshold seconds
+    trigger_distance: 0.5 #distance from the monitoring_part to the target to say that an action has been performed
+    actions_to_monitor: #actions that need to be monitored
       - pick    
       - place
       - fill
-    actions_details:
-      pick:
-        target: main_object
+    actions_details: 
+      #for each action we put put several actions_details
+      #target_info: the parameter_type of the action's target (each action defines its parameters)
+      #monitor_part: the joint used to compute the distance and check if the action has been done
+      #orientation_part: 
+      pick:   
+        target_info: main_object
         monitor_part: hand
-        orientation_part: torso
       place:
-        target: target
+        target_info: target
         monitor_part: hand
-        orientation_part: torso
       fill:
-        target: target
+        target_info: target
         monitor_part: hand
-        orientation_part: torso
     affordances:
+      #links an object to actions that can performed with it as a target
       waterbottle:
         - pick
       teabottle:
@@ -50,20 +51,24 @@ situation_assessment:
       sidetable:
         - place
   intention_recognition:
-    intention_list:
+    intention_list: # list of intentions
       - drink_water
       - drink_tea
       - go_out
       - read_book
       - watch_tv
       - clean_books
-    contexts:
+    contexts: #list of context
       - hot_day
       - cold_day
       - time_to_leave
       - evening
       - sunday
     intention_details:
+      #for each intention:
+      #mdp_path: path to the mdp (without extension)
+      #linked_contexts: contexts that influence this intention
+      #context_probabilities: conditional dependencies of the intention from the context
       drink_water:
         mdp_path: /home/theworld/ros_workspaces/indigo_ws/src/scenarios/demo_observer/mdp_models/drink_water
         linked_contexts:
@@ -101,6 +106,7 @@ situation_assessment:
         context_probabilities:
           - sunday: 0.7
     distance_threshold:
+      #threhsolds used for distance monitoring, from reach to far
       - 0.8
       - 1.5
       - 3
